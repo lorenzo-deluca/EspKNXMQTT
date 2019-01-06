@@ -19,15 +19,10 @@
 
 #include <EEPROM.h>
 
-#include <settings.h>
-
-// initial config
-syscfg_type SYSCONFIG = {
-	CONFIG_VERSION,
-	false};
+#include <include.h>
 
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
-int LoadConfiguration()
+int Configuration_Load()
 {
 	// is it correct?
 	if (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
@@ -36,7 +31,6 @@ int LoadConfiguration()
 		EEPROM.read(CONFIG_START + 3) == CONFIG_VERSION[3] &&
 		EEPROM.read(CONFIG_START + 4) == CONFIG_VERSION[4])
 	{
-
 		// load (overwrite) the local configuration struct
 		for (unsigned int i = 0; i < sizeof(SYSCONFIG); i++)
 		{
@@ -45,4 +39,12 @@ int LoadConfiguration()
 		return 1; // return 1 if config loaded
 	}
 	return 0; // return 0 if config NOT loaded
+}
+
+
+// save the CONFIGURATION in to EEPROM
+void Configuration_Save()
+{
+	for (unsigned int i = 0; i < sizeof(SYSCONFIG); i++)
+		EEPROM.write(CONFIG_START + i, *((char *)&SYSCONFIG + i));
 }

@@ -19,7 +19,28 @@
 
 #include <Arduino.h>
 
-void WriteLog(int logLevel, String str)
+extern "C"
 {
-    
+#include "user_interface.h"
 }
+
+#include <const.h>
+
+//
+// PROTOTYPES COMMON FUNCTIONS
+//
+
+// configuration manager
+extern int Configuration_Load();
+extern syscfg_type SYSCONFIG;
+extern bool wiFiConnected;
+
+// logger manager
+extern void WriteLog(int msgLevel, char *msgLog);
+extern void MQTT_Publish(char *topic, char * payload);
+
+// WiFi manager
+void WiFi_Startup();
+
+// KNX manager
+extern void KNX_Init();

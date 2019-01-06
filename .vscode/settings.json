@@ -9,7 +9,10 @@
         "deque": "cpp",
         "unordered_map": "cpp",
         "vector": "cpp",
-        "initializer_list": "cpp"
+        "initializer_list": "cpp",
+        "sstream": "cpp",
+        "cmath": "cpp",
+        "ostream": "cpp"
     },
 
     "arduino.path": "C:\\Program Files (x86)\\Arduino", 
