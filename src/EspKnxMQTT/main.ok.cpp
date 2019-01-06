@@ -40,7 +40,7 @@
   V 1.4 - ottimizzazione tempi di attesa
   V 1.3 - in modalitÃ  di connessione client NON attiva il server http per migliorare i tempi di risposta
 */
-
+/*
 #define _SW_VERSION "VER 2.0"
 
 #include <ESP8266WiFi.h>
@@ -182,11 +182,6 @@ void launchWeb(int webtype)
 		Serial.println("Server started");
 #endif
 	}
-
-	/*
-  // Add service to MDNS-SD (andrebbe dopo il server.begin)
-  MDNS.addService("http", "tcp", 80);
-*/
 }
 
 // -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -458,20 +453,7 @@ void handleGate() //  ipaddress/request?type=x&from=xx&to=yy&cmd=zz&resp=y
 		{
 			content = "{\"status\":\"OK\"}";
 			statusCode = 200;
-			/* 
-content = "<html>\
- <head>\
- <title>ESP8266 gate</title>\
- <style>\
-   body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }\
- </style>\
- </head>\
- <body>\
-   <h1><a href=status>Command received</a></h1>\
- </body>\
-</html>";
-   */
-			statusCode = 200;
+		
 			server.send(statusCode, "text/html", content);
 		}
 	}
@@ -686,19 +668,6 @@ void handleTest2()
 void createWebServer(int webtype)
 // -----------------------------------------------------------------------------------------------------------------------------------------------
 {
-
-	/*
-  if ( MDNS.begin ( "scsgate" ) ) {
-#ifdef DEBUG
-    Serial.println ( "MDNS responder started" );
-  }
-  else
-    Serial.println ( "MDNS responder ERROR" );
-#else
-    ; }
-#endif
-*/
-
 	if (webtype == 1) // server web AP
 	{
 		server.on("/", handleScan);
@@ -947,243 +916,222 @@ void loop()
 				port.endPacket();
 			}
 #else
-						 /*
-            if (strcmp(packetBuffer,"@V") == 0) // query version
-            {
-              int s;
-              for (s=0; s<sizeof(VERSION); s++) 
-              {
-                Serial.write(VERSION[s]);   // write on serial KNXgate/SCSgate 
-                delayMicroseconds(50);
-              }
-            }
-            else
-*/
-			if (strcmp(packetBuffer, "@Keep_alive") == 0)
-			{
-			}
+if (strcmp(packetBuffer, "@Keep_alive") == 0)
+{
+}
 #ifdef ECHO
-			else if (packetBuffer[0] == '>')
-			{
-				echoOn = 1;
-			}
-			else if (packetBuffer[0] == '<')
-			{
-				echoOn = 0;
-			}
+else if (packetBuffer[0] == '>')
+{
+	echoOn = 1;
+}
+else if (packetBuffer[0] == '<')
+{
+	echoOn = 0;
+}
 #endif
-			else
-			{
-				int s = 0;
-				while (s < len)
-				{
-					Serial.write(packetBuffer[s]); // write on serial KNXgate/SCSgate
-					delayMicroseconds(100);
-					s++;
-				}
-			}
-#endif
-		}
-
-		delay(1); // wait 1 mS (!)
-
-		// ====================================== receive from SERIAL - send to UDP =====================
-		// char replyBuffer[24];
-		// unsigned char replyLen;
-		//
-
-		replyLen = 0;
-		if (Serial.available())
-		{
-			while (Serial.available() && (replyLen < 255))
-			{
-				while (Serial.available() && (replyLen < 255))
-				{
-					replyBuffer[replyLen++] = Serial.read(); // receive from serial USB
-					delayMicroseconds(INNERWAIT);
-				}
-				delayMicroseconds(OUTERWAIT);
-			}
-			replyBuffer[replyLen] = 0;
-		}
-
-		if ((remote_ip) && (replyLen))
-		{
-#ifndef DEBUG_UDP
-			if (httpResp == "")
-#endif
-			{
-				int success;
-				do
-				{
-					success = port.beginPacket(remote_ip, remote_port);
-				} while (!success);
-
-#ifdef DEBUG_UDP
-				port.print("fromPic:[");
-				char hBuffer[12];
-				sprintf(hBuffer, "%02X", replyLen);
-				port.write(hBuffer[0]);
-				port.write(hBuffer[1]);
-				port.write(']');
-#endif
-
-				int n = 0;
-				// attenzione - ogni carattere sulla seriale ci mette circa 90uS ad arrivare
-				while (n < replyLen)
-				{
-#ifdef DEBUG_UDP
-					//            sprintf(hBuffer, "%02X", replyBuffer[n++]);
-					//            port.write(hBuffer[0]);
-					//            port.write(hBuffer[1]);
-					port.write(replyBuffer[n++]);
-					//            port.write('.');
-#else
-					port.write(replyBuffer[n++]);
-#endif
-				}
-				success = port.endPacket();
-			}
-
-#ifndef DEBUG_UDP
-			else
-#endif
-
-				if (((httpResp == "a") || (httpResp == "y")) && (callback[0] == ':'))
-			{
-#ifdef DEBUG
-				Serial.println(replyBuffer);
-				if ((replyBuffer[0] == '4') && (replyLen == 5))
-#else
-				if ((replyBuffer[0] == 4) && (replyLen == 5))
-#endif
-
-				// intero  7 A8 32 00 12 01 21 A3
-				// ridotto 4 32 00 12 01
-				{
-					content = "http://";
-					content += remote_ip.toString();
-					content += callback;
-					/*
-          content += ":";
-          content += String(8080);
-//        content += String(remote_port);
-          content += "/json.htm?type=command&param=udevices&script=scsgate_json.lua"; // <===== DOMOTICZ CALLBACK
-*/
-					char hBuffer[12];
-					sprintf(hBuffer, "&type=%02X", replyBuffer[3]);
-					content += hBuffer;
-					sprintf(hBuffer, "&from=%02X", replyBuffer[2]);
-					content += hBuffer;
-					sprintf(hBuffer, "&to=%02X", replyBuffer[1]);
-					content += hBuffer;
-					sprintf(hBuffer, "&cmd=%02X", replyBuffer[4]);
-					content += hBuffer;
-
-#ifdef DEBUG
-					Serial.println("request ");
-					Serial.println(content);
-					httpClient.begin(content);
-					//      httpClient.begin("http://192.168.2.181/index.htm");
-					//      httpClient.begin("http://192.168.2.9/test.htm?type=command&param=1");  //Specify request destination
-					//      httpClient.begin("http://jsonplaceholder.typicode.com/users/1");
-					//                        http://<domoticz ip>:<domoticz port>/json.htm?type=command&param='''udevices'''&script='''yoctopuce_meteo.lua'''&
-					//     http://<domoticz ip>:<domoticz port>/json.htm?type=command&param=udevices&script=yoctopuce_meteo.lua&timestamp=1446371516&network=&meteo%23dataLogger=OFF&meteo%23temperature=5.72&meteo%23pressure=889&meteo%23humidity=81.1
-					Serial.println("get");
-					int httpCode = httpClient.GET(); //Send the request
-					if (httpCode > 0)
-					{											 //Check the returning code
-						Serial.println("OK");					 // write on serial KNXgate/SCSgate
-						String payload = httpClient.getString(); //Get the request response payload
-						Serial.print(payload);					 //Print the response payload - debug
-					}
-					else
-					{
-						Serial.print("ERROR ");
-						Serial.println(httpCode);
-					}
-					httpClient.end(); //Close connection
-#else
-					/*
-       * /json.htm?type=command&param=udevice&idx=42&nvalue=0&svalue=Off
-       * /json.htm?type=command&param=udevice&idx=42&nvalue=1&svalue=On
-       * commandArray['UpdateDevice'] = '263|10|10' // 263=idx   10=lvl
-       * 
-       */
-					httpClient.begin(content);
-					int httpCode = httpClient.GET(); //Send the request
-					httpClient.end();				 //Close connection
-#endif
-				}
-			}
-		}
-
-		// =====================================================================================================
-
-#ifdef ECHO
-		if ((remote_ip) && (packetSize) && (echoOn))
-		{
-			int success;
-			do
-			{
-				success = port.beginPacket(remote_ip, remote_port);
-			} while (!success);
-			delay(5);					  // wait 5 mS (!)
-			port.write('0' + packetSize); // write on serial KNXgate/SCSgate
-			int s;
-			for (s = 0; s < packetSize; s++)
-			{
-				port.write(packetBuffer[s]); // write on serial KNXgate/SCSgate
-			}
-			success = port.endPacket();
-		}
-#endif
-
-		// =====================================================================================================
-	}
-
-	// =====================================================================================================
-	// =====================================================================================================
-
-	if (requestLen > 0)
+else
+{
+	int s = 0;
+	while (s < len)
 	{
-#ifdef DEBUG_UDP
+		Serial.write(packetBuffer[s]); // write on serial KNXgate/SCSgate
+		delayMicroseconds(100);
+		s++;
+	}
+}
+#endif
+}
+
+delay(1); // wait 1 mS (!)
+
+// ====================================== receive from SERIAL - send to UDP =====================
+// char replyBuffer[24];
+// unsigned char replyLen;
+//
+
+replyLen = 0;
+if (Serial.available())
+{
+	while (Serial.available() && (replyLen < 255))
+	{
+		while (Serial.available() && (replyLen < 255))
+		{
+			replyBuffer[replyLen++] = Serial.read(); // receive from serial USB
+			delayMicroseconds(INNERWAIT);
+		}
+		delayMicroseconds(OUTERWAIT);
+	}
+	replyBuffer[replyLen] = 0;
+}
+
+if ((remote_ip) && (replyLen))
+{
+#ifndef DEBUG_UDP
+	if (httpResp == "")
+#endif
+	{
 		int success;
 		do
 		{
 			success = port.beginPacket(remote_ip, remote_port);
 		} while (!success);
-		port.print("toPic:[");
-		port.write(requestLen);
+
+#ifdef DEBUG_UDP
+		port.print("fromPic:[");
+		char hBuffer[12];
+		sprintf(hBuffer, "%02X", replyLen);
+		port.write(hBuffer[0]);
+		port.write(hBuffer[1]);
 		port.write(']');
 #endif
-		// =========================== send control char and data over serial =============================
-		int s = 0;
-		while (s < requestLen)
+
+		int n = 0;
+		// attenzione - ogni carattere sulla seriale ci mette circa 90uS ad arrivare
+		while (n < replyLen)
 		{
-			Serial.write(requestBuffer[s]); // write on serial KNXgate/SCSgate
 #ifdef DEBUG_UDP
-			port.write(requestBuffer[s]);
+			//            sprintf(hBuffer, "%02X", replyBuffer[n++]);
+			//            port.write(hBuffer[0]);
+			//            port.write(hBuffer[1]);
+			port.write(replyBuffer[n++]);
+			//            port.write('.');
+#else
+			port.write(replyBuffer[n++]);
 #endif
-			//        delayMicroseconds(INNERWAIT);
-			delayMicroseconds(OUTERWAIT * 2);
-			s++;
 		}
-#ifdef DEBUG_UDP
-		port.write(']');
 		success = port.endPacket();
-#endif
-		requestLen = 0;
 	}
 
-	// =====================================================================================================
-	// =====================================================================================================
+#ifndef DEBUG_UDP
+	else
+#endif
 
-	if (webon == 1)
-		server.handleClient();
-	// =====================================================================================================
-	// =====================================================================================================
+		if (((httpResp == "a") || (httpResp == "y")) && (callback[0] == ':'))
+	{
+#ifdef DEBUG
+		Serial.println(replyBuffer);
+		if ((replyBuffer[0] == '4') && (replyLen == 5))
+#else
+		if ((replyBuffer[0] == 4) && (replyLen == 5))
+#endif
 
-	if (webon == 1)
-		server.handleClient();
+		// intero  7 A8 32 00 12 01 21 A3
+		// ridotto 4 32 00 12 01
+		{
+			content = "http://";
+			content += remote_ip.toString();
+			content += callback;
+			
+char hBuffer[12];
+sprintf(hBuffer, "&type=%02X", replyBuffer[3]);
+content += hBuffer;
+sprintf(hBuffer, "&from=%02X", replyBuffer[2]);
+content += hBuffer;
+sprintf(hBuffer, "&to=%02X", replyBuffer[1]);
+content += hBuffer;
+sprintf(hBuffer, "&cmd=%02X", replyBuffer[4]);
+content += hBuffer;
+
+#ifdef DEBUG
+Serial.println("request ");
+Serial.println(content);
+httpClient.begin(content);
+//      httpClient.begin("http://192.168.2.181/index.htm");
+//      httpClient.begin("http://192.168.2.9/test.htm?type=command&param=1");  //Specify request destination
+//      httpClient.begin("http://jsonplaceholder.typicode.com/users/1");
+//                        http://<domoticz ip>:<domoticz port>/json.htm?type=command&param='''udevices'''&script='''yoctopuce_meteo.lua'''&
+//     http://<domoticz ip>:<domoticz port>/json.htm?type=command&param=udevices&script=yoctopuce_meteo.lua&timestamp=1446371516&network=&meteo%23dataLogger=OFF&meteo%23temperature=5.72&meteo%23pressure=889&meteo%23humidity=81.1
+Serial.println("get");
+int httpCode = httpClient.GET(); //Send the request
+if (httpCode > 0)
+{											 //Check the returning code
+	Serial.println("OK");					 // write on serial KNXgate/SCSgate
+	String payload = httpClient.getString(); //Get the request response payload
+	Serial.print(payload);					 //Print the response payload - debug
 }
+else
+{
+	Serial.print("ERROR ");
+	Serial.println(httpCode);
+}
+httpClient.end(); //Close connection
+#else
+
+httpClient.begin(content);
+int httpCode = httpClient.GET(); //Send the request
+httpClient.end();				 //Close connection
+#endif
+}
+}
+}
+
+// =====================================================================================================
+
+#ifdef ECHO
+if ((remote_ip) && (packetSize) && (echoOn))
+{
+	int success;
+	do
+	{
+		success = port.beginPacket(remote_ip, remote_port);
+	} while (!success);
+	delay(5);					  // wait 5 mS (!)
+	port.write('0' + packetSize); // write on serial KNXgate/SCSgate
+	int s;
+	for (s = 0; s < packetSize; s++)
+	{
+		port.write(packetBuffer[s]); // write on serial KNXgate/SCSgate
+	}
+	success = port.endPacket();
+}
+#endif
+
+// =====================================================================================================
+}
+
+// =====================================================================================================
+// =====================================================================================================
+
+if (requestLen > 0)
+{
+#ifdef DEBUG_UDP
+	int success;
+	do
+	{
+		success = port.beginPacket(remote_ip, remote_port);
+	} while (!success);
+	port.print("toPic:[");
+	port.write(requestLen);
+	port.write(']');
+#endif
+	// =========================== send control char and data over serial =============================
+	int s = 0;
+	while (s < requestLen)
+	{
+		Serial.write(requestBuffer[s]); // write on serial KNXgate/SCSgate
+#ifdef DEBUG_UDP
+		port.write(requestBuffer[s]);
+#endif
+		//        delayMicroseconds(INNERWAIT);
+		delayMicroseconds(OUTERWAIT * 2);
+		s++;
+	}
+#ifdef DEBUG_UDP
+	port.write(']');
+	success = port.endPacket();
+#endif
+	requestLen = 0;
+}
+
+// =====================================================================================================
+// =====================================================================================================
+
+if (webon == 1)
+	server.handleClient();
+// =====================================================================================================
+// =====================================================================================================
+
+if (webon == 1)
+	server.handleClient();
+}
+*/
