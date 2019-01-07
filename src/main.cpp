@@ -90,6 +90,11 @@ void MQTT_Reconnect()
 
 			// subscribe TOPIC_CMD => command from master
 			_MQTTClient.subscribe(TOPIC_CMD);
+
+			// subscribe set command topic
+			char set_topic[100];
+			snprintf_P(set_topic, sizeof(set_topic), PSTR("%s/#"), TOPIC_DISCOVERY);
+			_MQTTClient.subscribe(set_topic);
 		}
 		else
 		{
@@ -107,23 +112,23 @@ void MQTT_Reconnect()
 
 void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 {
-	//	String ComandoRicevuto = "";
-	char Log[255];
+	//
+	char log[200];
+	snprintf_P(log, sizeof(log), "Arrived %d byte on topic %s", length, topic);
+	WriteLog(LOG_LEVEL_DEBUG, log);
 
-	sprintf(Log, "Arrived %d byte on topic %s", length, topic);
-	WriteLog(LOG_LEVEL_DEBUG, Log);
+	String ComandoRicevuto = "";
+	for (int i = 0; i < (int)length; i++)
+		ComandoRicevuto = ComandoRicevuto + (char)payload[i];
 
-	// Compongo Comando Ricevuto
-	//	for (unsigned int i = 0; i < length; i++)
-	//		ComandoRicevuto = ComandoRicevuto + (char)payload[i];
-
-	char *cstring = (char *)payload;
-	cstring[length] = '\0'; // Adds a terminate terminate to end of string based on length of current payload
-
-	WriteLog(LOG_LEVEL_DEBUG, cstring);
+	WriteLog(LOG_LEVEL_DEBUG, ComandoRicevuto.c_str());
 
 	if (strcmp(topic, TOPIC_CMD) == 0)
 	{
+		if (ComandoRicevuto == String("MQTTDiscoveryOn"))
+			mqttDiscoveryEnabled = true;
+		else if (ComandoRicevuto == String("MQTTDiscoveryOff"))
+			mqttDiscoveryEnabled = false;
 	}
 	else if (strcmp(topic, "pir1Status") == 0)
 	{

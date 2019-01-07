@@ -56,18 +56,20 @@ enum LoggingLevels
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
-
-#define MQTT_DEVICE "EspKnxMQTT"
+#define mqtt_device "EspKnxMQTT"
 
 // MQTT Topics
-#define TOPIC_PREFIX "knxhome"
-
-#define TOPIC_LOG "/log"
+#define TOPIC_PREFIX ""
+#define TOPIC_LOG "knxhome/log"
 #define TOPIC_STATE "knxhome/state"
 #define TOPIC_BUS "knxhome/bus"
 #define TOPIC_CMD "knxhome/cmd"
 
+// Discovery
+#define TOPIC_SWITCH_SET "knxhome/switch/set"
+#define TOPIC_SWITCH_STATE "knxhome/switch/state"
 #define TOPIC_DISCOVERY "homeassistant/switch/%s/config"
+
 
 #define LOOP_INTERVAL_MILLISEC 250
 

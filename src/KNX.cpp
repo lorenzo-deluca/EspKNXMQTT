@@ -131,8 +131,6 @@ void KNX_Init()
 
 bool KNX_CheckTelegram(String knxTelegram)
 {
-
-
 }
 
 void KNX_ReadBus()
@@ -154,12 +152,12 @@ void KNX_ReadBus()
     */
 
     // check telegram length
-    if (knxRead.length() == 20) 
+    if (knxRead.length() == 20)
     {
         // check telegram header
         if (knxRead[2] == 'B' && knxRead[3] == '4')
         {
-            // get Knx device address 
+            // get Knx device address
             char devKnxAddress[5];
             devKnxAddress[0] = knxRead[8];
             devKnxAddress[1] = knxRead[9];
@@ -167,19 +165,34 @@ void KNX_ReadBus()
             devKnxAddress[3] = knxRead[11];
             devKnxAddress[4] = 0;
 
+            char mqtt_data[200];
+            char mqtt_topic[200];
+
             if (mqttDiscoveryEnabled)
             {
-                char mqtt_data[200];
-                char mqtt_topic[200];
                 snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s%s"), TOPIC_DISCOVERY, devKnxAddress);
 
-                snprintf_P(mqtt_data, sizeof(mqtt_data), "{\"name\": \"%s\", \"command_topic\": \"knxhome/switch/%s/set\", \"state_topic\":\"knxhome/switch/%s/state\"}",
-                        devKnxAddress, devKnxAddress, devKnxAddress);
-                MQTT_Publish(mqtt_topic, mqtt_data);
-
-                WriteLog(LOG_LEVEL_DEBUG, mqtt_topic);
-                WriteLog(LOG_LEVEL_DEBUG, mqtt_data);
+                snprintf_P(mqtt_data, sizeof(mqtt_data), "{\"name\": \"%s\", \"command_topic\": \"%s/%s\", \"state_topic\":\"%s/%s\"}",
+                           devKnxAddress,
+                           TOPIC_SWITCH_SET,
+                           devKnxAddress,
+                           TOPIC_SWITCH_STATE,
+                           devKnxAddress);
             }
+            else
+            {
+                snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s/%s"), TOPIC_SWITCH_STATE, devKnxAddress);
+
+                if (knxRead[16] == '8' && knxRead[17] == '1')
+                    snprintf_P(mqtt_data, sizeof(mqtt_data), "ON");
+                else
+                    snprintf_P(mqtt_data, sizeof(mqtt_data), "OFF");
+            }
+
+            MQTT_Publish(mqtt_topic, mqtt_data);
+
+            WriteLog(LOG_LEVEL_DEBUG, mqtt_topic); // remove
+            WriteLog(LOG_LEVEL_DEBUG, mqtt_data);  // remove
         }
     }
 }
