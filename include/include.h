@@ -34,13 +34,17 @@ extern "C"
 extern int Configuration_Load();
 extern syscfg_type SYSCONFIG;
 extern bool wiFiConnected;
+extern bool mqttDiscoveryOn;
 
 // logger manager
 extern void WriteLog(int msgLevel, char *msgLog);
 extern void MQTT_Publish(char *topic, char * payload);
 
 // WiFi manager
-void WiFi_Startup();
+extern void WiFi_Startup();
 
 // KNX manager
 extern void KNX_Init();
+extern void KNX_ReadBus();
+
+extern char *string2char(String command);

@@ -62,6 +62,8 @@ enum LoggingLevels
 #define TOPIC_BUS "knxhome/bus"
 #define TOPIC_CMD "knxhome/cmd"
 
+#define TOPIC_DISCOVERY "homeassistant/switch/%s/config"
+
 #define D_ASTERIX "********"
 #define WIFI_HOSTNAME "%s-%04d" // Expands to <MQTT_TOPIC>-<last 4 decimal chars of MAC address>
 #define D_WEBLINK "https://bit.ly/tasmota"

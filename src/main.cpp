@@ -28,16 +28,21 @@
 bool mqttConnected = false;
 bool wiFiConnected = false;
 bool KnxGateInit = false;
+bool mqttDiscoveryOn = true;
 
 // initial config
 syscfg_type SYSCONFIG = {
 	CONFIG_VERSION,
 	false,
 	true,
+	LOG_LEVEL_ERROR,
 	LOG_LEVEL_ALL};
 
 WiFiClient _WiFiClient;
 PubSubClient _MQTTClient(_WiFiClient);
+
+long previousMillis = 0; // Timer loop from http://www.arduino.cc/en/Tutorial/BlinkWithoutDelay
+long interval = 500;
 
 void MQTT_Publish(char *topic, char *payload)
 {
@@ -61,7 +66,11 @@ void WriteLog(int msgLevel, char *msgLog)
 		Serial.println(msgLog);
 
 	if (SYSCONFIG.mqttLogLevel >= msgLevel)
+	{
+		char Log[250];
+		snprintf_P(Log, sizeof(Log), "%d - %s", millis(), msgLog);
 		MQTT_Publish(TOPIC_LOG, msgLog);
+	}
 }
 
 void MQTT_Reconnect()
@@ -77,7 +86,7 @@ void MQTT_Reconnect()
 			WriteLog(LOG_LEVEL_DEBUG, "connected");
 			mqttConnected = true;
 
-			MQTT_Publish(TOPIC_LOG, "ESP Connesso");
+			WriteLog(LOG_LEVEL_INFO, "EspKnxMQTT ONLINE!");
 
 			// subscribe TOPIC_CMD => command from master
 			_MQTTClient.subscribe(TOPIC_CMD);
@@ -132,12 +141,12 @@ void setup()
 	pinMode(0, OUTPUT);
 
 	// aspetta 15 secondi perche' con l'assorbimento iniziale di corrente esp8266 fa disconnettere l'adattatore seriale
-	int pauses = 0;
-	while (pauses < 150) // 15 secondi wait
-	{
-		pauses++;
-		delay(100); // wait 100ms
-	}
+	//	int pauses = 0;
+	//	while (pauses < 150) // 15 secondi wait
+	//	{
+	//		pauses++;
+	//		delay(100); // wait 100ms
+	//	}
 
 	Serial.begin(115200);
 	while (!Serial)
@@ -176,5 +185,27 @@ void loop()
 	{
 		KNX_Init();
 		KnxGateInit = true;
+	}
+	else
+	{
+
+		// millisecondi attuali
+		unsigned long currentMillis = millis();
+
+		if (currentMillis - previousMillis >= interval)
+		{
+			KNX_ReadBus();
+
+			/*
+			if (CmdExec != CMD_NO_CDM)
+			{
+				KyoUnit_GesCmdExec(CmdExec);
+				CmdExec = CMD_NO_CDM;
+			}
+			*/
+
+			// salvo ultima esecuzione
+			previousMillis = currentMillis;
+		}
 	}
 }
