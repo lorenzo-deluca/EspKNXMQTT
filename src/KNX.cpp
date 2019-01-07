@@ -71,10 +71,10 @@ String KNX_Receive()
     return "";
 }
 
-String KNX_Send(char *msg, bool waitresponse = false, bool trace = true, int millsdelay = 5)
+String KNX_Send(String msg, bool waitresponse = false, bool trace = true, int millsdelay = 5)
 {
     Serial.flush();
-    for (int i = 0; i < strlen(msg); i++)
+    for (unsigned int i = 0; i < msg.length(); i++)
     {
         Serial.write(msg[i]);
         delayMicroseconds(100);
@@ -83,7 +83,7 @@ String KNX_Send(char *msg, bool waitresponse = false, bool trace = true, int mil
     if (SYSCONFIG.mqttEnable && trace)
     {
         char log[250];
-        snprintf_P(log, sizeof(log), "TX >> [%s]", msg);
+        snprintf_P(log, sizeof(log), "TX >> [%s]", msg.c_str());
         MQTT_Publish(TOPIC_BUS, log);
     }
 
@@ -129,15 +129,37 @@ void KNX_Init()
     Serial.setTimeout(10); // timeout is 10mS
 }
 
+bool KNX_CheckTelegram(String knxTelegram)
+{
+
+
+}
+
 void KNX_ReadBus()
 {
     String knxRead;
     knxRead = KNX_Send("@r", true, false);
 
-    if (knxRead.length() == 20) // 09 B4 100B 0B25 E100 81 1E
+    /*
+        KNX Example telegram (from Vimar By-Me bus)
+        
+        09 B4 100B 0B25 E100 81 1E => 
+            09  = not implemented
+            B4  = VIMAR Prefix
+            100B = Group Source address
+        --> 0B25 = Group Destination Address <-- 
+            E100 = not implemented
+            81  = ON COMMAND
+            1E = CRC
+    */
+
+    // check telegram length
+    if (knxRead.length() == 20) 
     {
+        // check telegram header
         if (knxRead[2] == 'B' && knxRead[3] == '4')
         {
+            // get Knx device address 
             char devKnxAddress[5];
             devKnxAddress[0] = knxRead[8];
             devKnxAddress[1] = knxRead[9];
@@ -145,11 +167,11 @@ void KNX_ReadBus()
             devKnxAddress[3] = knxRead[11];
             devKnxAddress[4] = 0;
 
-            if (mqttDiscoveryOn)
+            if (mqttDiscoveryEnabled)
             {
                 char mqtt_data[200];
                 char mqtt_topic[200];
-                sprintf(mqtt_topic, TOPIC_DISCOVERY, devKnxAddress);
+                snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s%s"), TOPIC_DISCOVERY, devKnxAddress);
 
                 snprintf_P(mqtt_data, sizeof(mqtt_data), "{\"name\": \"%s\", \"command_topic\": \"knxhome/switch/%s/set\", \"state_topic\":\"knxhome/switch/%s/state\"}",
                         devKnxAddress, devKnxAddress, devKnxAddress);

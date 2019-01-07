@@ -25,10 +25,12 @@
 
 typedef struct
 {
-    char version[6]; // detect if setting actually are written
+    // configuration version
+    char version[6];
 
     bool networkConfig;
     bool mqttEnable;
+    bool mqttUpdateEnable;
 
     int serialLogLevel;
     int mqttLogLevel;
@@ -54,15 +56,20 @@ enum LoggingLevels
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
-#define mqtt_device "EspKnxMQTT"
+
+#define MQTT_DEVICE "EspKnxMQTT"
 
 // MQTT Topics
-#define TOPIC_LOG "knxhome/log"
+#define TOPIC_PREFIX "knxhome"
+
+#define TOPIC_LOG "/log"
 #define TOPIC_STATE "knxhome/state"
 #define TOPIC_BUS "knxhome/bus"
 #define TOPIC_CMD "knxhome/cmd"
 
 #define TOPIC_DISCOVERY "homeassistant/switch/%s/config"
+
+#define LOOP_INTERVAL_MILLISEC 250
 
 #define D_ASTERIX "********"
 #define WIFI_HOSTNAME "%s-%04d" // Expands to <MQTT_TOPIC>-<last 4 decimal chars of MAC address>

@@ -17,7 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// other libraries
+// external library
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
@@ -28,12 +28,13 @@
 bool mqttConnected = false;
 bool wiFiConnected = false;
 bool KnxGateInit = false;
-bool mqttDiscoveryOn = true;
+bool mqttDiscoveryEnabled = false;
 
 // initial config
 syscfg_type SYSCONFIG = {
 	CONFIG_VERSION,
 	false,
+	true,
 	true,
 	LOG_LEVEL_ERROR,
 	LOG_LEVEL_ALL};
@@ -42,9 +43,8 @@ WiFiClient _WiFiClient;
 PubSubClient _MQTTClient(_WiFiClient);
 
 long previousMillis = 0; // Timer loop from http://www.arduino.cc/en/Tutorial/BlinkWithoutDelay
-long interval = 500;
 
-void MQTT_Publish(char *topic, char *payload)
+void MQTT_Publish(const char *topic, const char *payload)
 {
 	if (!mqttConnected)
 		return;
@@ -60,7 +60,7 @@ void MQTT_Publish(char *topic, char *payload)
 	}
 }
 
-void WriteLog(int msgLevel, char *msgLog)
+void WriteLog(int msgLevel, const char *msgLog)
 {
 	if (SYSCONFIG.serialLogLevel >= msgLevel)
 		Serial.println(msgLog);
@@ -68,7 +68,7 @@ void WriteLog(int msgLevel, char *msgLog)
 	if (SYSCONFIG.mqttLogLevel >= msgLevel)
 	{
 		char Log[250];
-		snprintf_P(Log, sizeof(Log), "%d - %s", millis(), msgLog);
+		snprintf_P(Log, sizeof(Log), "%lu - %s", millis(), msgLog);
 		MQTT_Publish(TOPIC_LOG, msgLog);
 	}
 }
@@ -192,7 +192,7 @@ void loop()
 		// millisecondi attuali
 		unsigned long currentMillis = millis();
 
-		if (currentMillis - previousMillis >= interval)
+		if (currentMillis - previousMillis >= LOOP_INTERVAL_MILLISEC)
 		{
 			KNX_ReadBus();
 
