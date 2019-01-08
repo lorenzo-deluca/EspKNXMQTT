@@ -30,7 +30,7 @@ bool wiFiConnected = false;
 bool KnxGateInit = false;
 bool mqttDiscoveryEnabled = false;
 
-// initial config
+// initial default config
 syscfg_type SYSCONFIG = {
 	CONFIG_VERSION,
 	false,
@@ -42,7 +42,11 @@ syscfg_type SYSCONFIG = {
 WiFiClient _WiFiClient;
 PubSubClient _MQTTClient(_WiFiClient);
 
-long previousMillis = 0; // Timer loop from http://www.arduino.cc/en/Tutorial/BlinkWithoutDelay
+// Timer loop from http://www.arduino.cc/en/Tutorial/BlinkWithoutDelayS
+long previousMillis = 0;
+
+// Instantiate command queue https://github.com/SMFSW/Queue/
+Queue commandList(sizeof(command), CMD_LIST_SIZE, CMD_LIST_IMPLEMENTATION);
 
 void MQTT_Publish(const char *topic, const char *payload)
 {
@@ -93,7 +97,7 @@ void MQTT_Reconnect()
 
 			// subscribe set command topic
 			char set_topic[100];
-			snprintf_P(set_topic, sizeof(set_topic), PSTR("%s/#"), TOPIC_DISCOVERY);
+			snprintf_P(set_topic, sizeof(set_topic), PSTR("%s/#"), TOPIC_SWITCH_SET);
 			_MQTTClient.subscribe(set_topic);
 		}
 		else
@@ -110,33 +114,74 @@ void MQTT_Reconnect()
 	}
 }
 
+String getValue(String data, char separator, int index)
+{
+	int found = 0;
+	int strIndex[] = {0, -1};
+	int maxIndex = data.length() - 1;
+
+	for (int i = 0; i <= maxIndex && found <= index; i++)
+	{
+		if (data.charAt(i) == separator || i == maxIndex)
+		{
+			found++;
+			strIndex[0] = strIndex[1] + 1;
+			strIndex[1] = (i == maxIndex) ? i + 1 : i;
+		}
+	}
+
+	return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
 void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 {
 	//
+	//char log[200];
+	//	snprintf_P(log, sizeof(log), "Arrived %d byte on topic %s", length, topic);
+	//	WriteLog(LOG_LEVEL_DEBUG, log);
+
+	String received_payload = "";
+	for (int i = 0; i < (int)length; i++)
+		received_payload = received_payload + (char)payload[i];
+
+	String received_topic = "";
+	received_topic = String(topic);
+
 	char log[200];
-	snprintf_P(log, sizeof(log), "Arrived %d byte on topic %s", length, topic);
+	snprintf_P(log, sizeof(log), "Topic %s - payload  %s", received_topic.c_str(), received_payload.c_str());
 	WriteLog(LOG_LEVEL_DEBUG, log);
 
-	String ComandoRicevuto = "";
-	for (int i = 0; i < (int)length; i++)
-		ComandoRicevuto = ComandoRicevuto + (char)payload[i];
-
-	WriteLog(LOG_LEVEL_DEBUG, ComandoRicevuto.c_str());
-
-	if (strcmp(topic, TOPIC_CMD) == 0)
+	if (received_topic == String(TOPIC_CMD))
 	{
-		if (ComandoRicevuto == String("MQTTDiscoveryOn"))
+		if (received_payload == String("MQTTDiscoveryOn"))
+		{
+			WriteLog(LOG_LEVEL_INFO, "mqttDiscoveryEnabled = true");
 			mqttDiscoveryEnabled = true;
-		else if (ComandoRicevuto == String("MQTTDiscoveryOff"))
+		}
+		else if (received_payload == String("MQTTDiscoveryOff"))
+		{
+			WriteLog(LOG_LEVEL_INFO, "mqttDiscoveryEnabled = false");
 			mqttDiscoveryEnabled = false;
+		}
 	}
-	else if (strcmp(topic, "pir1Status") == 0)
+	else if (received_topic.indexOf(TOPIC_SWITCH_SET) == 0)
 	{
-	}
+		command receivedCommand;
+		if (received_payload == String("ON"))
+			receivedCommand.cmdType = CMD_TYPE_ON;
+		else
+			receivedCommand.cmdType = CMD_TYPE_OFF;
 
-	//sprintf(Log, "Ricevuto Comando <%s>", string2char(ComandoRicevuto));
-	//client.publish(trace_topic, Log);
-	//	GestioneComando(ComandoRicevuto);
+		// knx device address request
+		String value1 = getValue(received_topic, '/', 3);
+
+		// copy knx device address
+		memcpy(receivedCommand.knxDeviceAddress, value1.c_str(), 4);
+		receivedCommand.knxDeviceAddress[KNX_DEVICE_ADDRESS_SIZE-1] = 0;
+
+		// push in command queue
+		commandList.push(&receivedCommand);
+	}
 }
 
 void setup()
@@ -177,37 +222,44 @@ void setup()
 
 void loop()
 {
+	//
 	// code life cycle
+	//
 
-	// in case of disconnect
+	// in case of mqtt disconnect
 	if (!_MQTTClient.connected())
 		MQTT_Reconnect();
 
 	// loop mqtt client
 	_MQTTClient.loop();
 
+	// initialize gate
 	if (!KnxGateInit)
 	{
-		KNX_Init();
-		KnxGateInit = true;
+		KnxGateInit = KNX_Init();
 	}
 	else
 	{
-
-		// millisecondi attuali
+		// current millisec
 		unsigned long currentMillis = millis();
 
 		if (currentMillis - previousMillis >= LOOP_INTERVAL_MILLISEC)
 		{
-			KNX_ReadBus();
-
-			/*
-			if (CmdExec != CMD_NO_CDM)
+			// check
+			for (int i = 0; i < commandList.getCount(); i++)
 			{
-				KyoUnit_GesCmdExec(CmdExec);
-				CmdExec = CMD_NO_CDM;
+				command cmd;
+				commandList.pop(&cmd);
+				
+				char log[250];
+				snprintf_P(log, sizeof(log), "exec command type %d to device address [%s]", cmd.cmdType, cmd.knxDeviceAddress);
+				WriteLog(LOG_LEVEL_DEBUG, log);
+
+				KNX_ExeCommand(cmd.knxDeviceAddress,  cmd.cmdType);
 			}
-			*/
+
+			// read bus
+			KNX_ReadBus();
 
 			// salvo ultima esecuzione
 			previousMillis = currentMillis;

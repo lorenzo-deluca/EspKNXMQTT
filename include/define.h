@@ -47,6 +47,25 @@ enum LoggingLevels
     LOG_LEVEL_ALL
 };
 
+enum commandType
+{
+    CMD_TYPE_ON,
+    CMD_TYPE_OFF,
+    CMD_TYPE_UP,
+    CMD_TYPE_DOWN
+};
+
+// command list struct
+#define CMD_LIST_IMPLEMENTATION FIFO
+#define CMD_LIST_SIZE 20
+
+#define KNX_DEVICE_ADDRESS_SIZE 5
+
+typedef struct _command {
+	char	knxDeviceAddress[KNX_DEVICE_ADDRESS_SIZE];
+	int     cmdType;
+} command;
+
 // WIFI
 #define wifi_ssid "WiFiLDL_iOT"
 #define wifi_password "pswiOT2017!"
@@ -70,13 +89,7 @@ enum LoggingLevels
 #define TOPIC_SWITCH_STATE "knxhome/switch/state"
 #define TOPIC_DISCOVERY "homeassistant/switch/%s/config"
 
-
 #define LOOP_INTERVAL_MILLISEC 250
-
-#define D_ASTERIX "********"
-#define WIFI_HOSTNAME "%s-%04d" // Expands to <MQTT_TOPIC>-<last 4 decimal chars of MAC address>
-#define D_WEBLINK "https://bit.ly/tasmota"
-#define VERSION 0x06020100
 
 #define D_PROGRAMNAME "EspKnxMQTT"
 #define D_AUTHOR "Lorenzo De Luca"
