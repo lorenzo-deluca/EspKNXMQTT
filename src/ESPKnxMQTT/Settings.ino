@@ -1,5 +1,5 @@
 /*
-  settings.cpp - ESPKNXMQTT
+  Settings.ino - ESPKNXMQTT
 
   Copyright (C) 2019 Lorenzo De Luca (me@lorenzodeluca.info)
 
@@ -19,7 +19,7 @@
 
 #include <EEPROM.h>
 
-#include <include.h>
+extern _syscfgType SYSCONFIG;
 
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
 int Configuration_Load()

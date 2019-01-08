@@ -17,13 +17,17 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef _MY_HEADER_H
+#define _MY_HEADER_H
+
+
 // configuration version
 #define CONFIG_VERSION "CFG01"
 
 // where in EEPROM
 #define CONFIG_START 32
 
-typedef struct
+struct _syscfgType
 {
     // configuration version
     char version[6];
@@ -34,8 +38,15 @@ typedef struct
 
     int serialLogLevel;
     int mqttLogLevel;
+};
 
-} syscfg_type;
+struct _runtimeType
+{
+    bool mqttConnected;
+    bool wiFiConnected;
+    bool KnxGateInit;
+    bool mqttDiscoveryEnabled;
+};
 
 enum LoggingLevels
 {
@@ -61,10 +72,11 @@ enum commandType
 
 #define KNX_DEVICE_ADDRESS_SIZE 5
 
-typedef struct _command {
-	char	knxDeviceAddress[KNX_DEVICE_ADDRESS_SIZE];
-	int     cmdType;
-} command;
+struct _command
+{
+    char knxDeviceAddress[KNX_DEVICE_ADDRESS_SIZE];
+    int cmdType;
+};
 
 // WIFI
 #define wifi_ssid "WiFiLDL_iOT"
@@ -93,3 +105,5 @@ typedef struct _command {
 
 #define D_PROGRAMNAME "EspKnxMQTT"
 #define D_AUTHOR "Lorenzo De Luca"
+
+#endif

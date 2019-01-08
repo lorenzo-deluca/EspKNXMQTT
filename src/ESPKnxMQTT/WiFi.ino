@@ -1,5 +1,5 @@
 /*
-  WiFi.cpp - ESPKNXMQTT
+  WiFi.ino - ESPKNXMQTT
 
   Copyright (C) 2019 Lorenzo De Luca (me@lorenzodeluca.info)
 
@@ -18,7 +18,6 @@
 */
 
 #include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino
-#include <include.h>
 
 String IpAddress2String(const IPAddress &ipAddress)
 {
@@ -39,7 +38,7 @@ char *string2char(String command)
         return NULL;
 }
 
-void WiFi_Startup()
+bool WiFi_Startup()
 {
     delay(10);
 
@@ -62,5 +61,5 @@ void WiFi_Startup()
     WriteLog(LOG_LEVEL_DEBUG, "WiFi connected - IPv4 =");
     WriteLog(LOG_LEVEL_DEBUG, string2char(IpAddress2String(WiFi.localIP())));
 
-    wiFiConnected = true;
+    return true;
 }

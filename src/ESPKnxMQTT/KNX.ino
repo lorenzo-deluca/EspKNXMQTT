@@ -1,5 +1,5 @@
 /*
-  KNX.cpp - ESPKNXMQTT
+  KNX.ino - ESPKNXMQTT
 
   Copyright (C) 2019 Lorenzo De Luca (me@lorenzodeluca.info)
 
@@ -17,21 +17,17 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <include.h>
+#include "Arduino.h"
+
+#include "./define.h"
 
 #define INNERWAIT 80  // inner loop delay
 #define OUTERWAIT 100 // outer loop delay
 
-void char_to_bytes(char buffer[], byte out[])
-{
-    auto getNum = [](char c) { return c > '9' ? c - 'a' + 10 : c - '0'; };
-    byte *ptr = out;
+extern _syscfgType SYSCONFIG;
+extern _runtimeType RUNTIME;
 
-    for (char *idx = buffer; *idx != 0; ++idx, ++ptr)
-    {
-        *ptr = (getNum(*idx++) << 4) + getNum(*idx);
-    }
-}
+extern void MQTT_Publish(const char *topic, const char *payload);
 
 void bytes_to_char(byte array[], unsigned int len, char buffer[])
 {
@@ -169,21 +165,20 @@ bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
     cmd[1] = 0x10;
     cmd[2] = 0x0B;
 
-   // char_to_bytes(knxDeviceAddress, &cmd[3]);
-
+    // char_to_bytes(knxDeviceAddress, &cmd[3]);
     char addr[3];
     addr[0] = knxDeviceAddress[0];
     addr[1] = knxDeviceAddress[1];
     addr[2] = 0;
-    cmd[3] =  byte(strtol(addr, NULL, 16));
- 
+    cmd[3] = byte(strtol(addr, NULL, 16));
+
     addr[0] = knxDeviceAddress[2];
     addr[1] = knxDeviceAddress[3];
     addr[2] = 0;
     cmd[4] = byte(strtol(addr, NULL, 16));
 
     //cmd[4] = 0x25;
-    
+
     cmd[5] = 0xE1;
     cmd[6] = 0x00;
 
@@ -209,6 +204,8 @@ bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
         delayMicroseconds(100);
     }
 
+    Serial.flush();
+
     //char log[200];
     //bytes_to_char(cmd, 9, log);
     //WriteLog(LOG_LEVEL_DEBUG, cmd);
@@ -219,12 +216,13 @@ bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
     snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s/%s"), TOPIC_SWITCH_STATE, knxDeviceAddress);
 
     if (cmdType == CMD_TYPE_ON)
-
         snprintf_P(mqtt_data, sizeof(mqtt_data), "ON");
     else
         snprintf_P(mqtt_data, sizeof(mqtt_data), "OFF");
 
     MQTT_Publish(mqtt_topic, mqtt_data);
+
+    delay(100);
 
     return true;
 }
@@ -271,7 +269,7 @@ void KNX_ReadBus()
             char mqtt_data[200];
             char mqtt_topic[100];
 
-            if (mqttDiscoveryEnabled)
+            if (RUNTIME.mqttDiscoveryEnabled)
             {
                 snprintf_P(mqtt_topic, sizeof(mqtt_topic), TOPIC_DISCOVERY, knxDeviceAddress);
 
