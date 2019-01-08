@@ -24,11 +24,6 @@
 #define INNERWAIT 80  // inner loop delay
 #define OUTERWAIT 100 // outer loop delay
 
-extern _syscfgType SYSCONFIG;
-extern _runtimeType RUNTIME;
-
-extern void MQTT_Publish(const char *topic, const char *payload);
-
 void bytes_to_char(byte array[], unsigned int len, char buffer[])
 {
     for (unsigned int i = 0; i < len; i++)

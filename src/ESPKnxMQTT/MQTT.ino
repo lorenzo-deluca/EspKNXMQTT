@@ -19,9 +19,6 @@
 
 #include "./define.h"
 
-extern _syscfgType SYSCONFIG;
-extern _runtimeType RUNTIME;
-
 String getValue(String data, char separator, int index)
 {
 	int found = 0;
