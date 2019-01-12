@@ -94,6 +94,7 @@ void setup()
 	// startup Wifi Connection
 	RUNTIME.wiFiConnected = WiFi_Startup();
 
+	// configure MQTT
 	_MQTTClient.setServer(MQTT_SERVER, MQTT_PORT);
 	_MQTTClient.setCallback(MQTT_Callback);
 }
@@ -129,17 +130,13 @@ void loop()
 				_command cmd;
 				commandList.pop(&cmd);
 
-				char log[250];
-				snprintf_P(log, sizeof(log), "exec command type %d to device address [%s]", cmd.cmdType, cmd.knxDeviceAddress);
-				WriteLog(LOG_LEVEL_DEBUG, log);
-
 				KNX_ExeCommand(cmd.knxDeviceAddress, cmd.cmdType);
 			}
 
 			// read bus
 			KNX_ReadBus();
 
-			// salvo ultima esecuzione
+			// save last exec
 			previousMillis = currentMillis;
 		}
 	}

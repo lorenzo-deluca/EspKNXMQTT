@@ -73,17 +73,16 @@ String KNX_Receive()
     return "";
 }
 
-String KNX_Send(String msg, bool waitresponse = false, bool trace = true, int millsdelay = 5)
+String KNX_Send(String msg, bool waitresponse = false, bool trace = true, int millsdelay = 50)
 {
     Serial.flush();
-    /*
+
     for (unsigned int i = 0; i < msg.length(); i++)
     {
         Serial.write(msg[i]);
         delayMicroseconds(100);
     }
-    */
-    Serial.write(msg.c_str());
+    //Serial.write(msg.c_str());
 
     if (SYSCONFIG.mqttEnable && trace)
     {
@@ -92,8 +91,8 @@ String KNX_Send(String msg, bool waitresponse = false, bool trace = true, int mi
         MQTT_Publish(TOPIC_BUS, log);
     }
 
+    //wait for response
     delay(millsdelay);
-    yield();
 
     if (waitresponse)
     {
@@ -112,10 +111,10 @@ bool KNX_Send(char ch, bool waitresponse = false, bool trace = true, int millsde
 bool KNX_Init()
 {
     // set led lamps
-    KNX_Send("@");
+    KNX_Send("@", true);
 
-    // set led lampùs low-freq (client mode)
-    KNX_Send((char)0xF0);
+    // set led lamps low-freq (client mode)
+    KNX_Send((char)0xF0, true);
 
     // Set KNXgate hex mode
     KNX_Send("@MX", true);
@@ -141,7 +140,7 @@ bool KNX_CheckTelegram(String knxTelegram)
     return true;
 }
 
-byte KNX_CRC(char telegram[], int length)
+byte KNX_CRC(byte telegram[], int length)
 {
     byte crc = 0xFF;
 
@@ -151,28 +150,35 @@ byte KNX_CRC(char telegram[], int length)
     return crc;
 }
 
+byte KNX_ConvertByte(char cByte_1, char cByte_2)
+{
+    byte bByte;
+
+    char addr[3];
+    addr[0] = cByte_1;
+    addr[1] = cByte_2;
+    addr[2] = 0;
+    bByte = byte(strtol(addr, NULL, 16));
+
+    return bByte;
+}
+
 bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
 {
-    char cmd[20];
+    char log[250];
+    snprintf_P(log, sizeof(log), "KNX_ExeCommand - type [%d] to Device [%s]", cmdType, knxDeviceAddress);
+    WriteLog(LOG_LEVEL_INFO, log);
+
+    byte cmd[20];
 
     // B4 10 0B 0B 25 E1 00 81 1E
     cmd[0] = 0xB4;
     cmd[1] = 0x10;
     cmd[2] = 0x0B;
 
-    // char_to_bytes(knxDeviceAddress, &cmd[3]);
-    char addr[3];
-    addr[0] = knxDeviceAddress[0];
-    addr[1] = knxDeviceAddress[1];
-    addr[2] = 0;
-    cmd[3] = byte(strtol(addr, NULL, 16));
-
-    addr[0] = knxDeviceAddress[2];
-    addr[1] = knxDeviceAddress[3];
-    addr[2] = 0;
-    cmd[4] = byte(strtol(addr, NULL, 16));
-
-    //cmd[4] = 0x25;
+    // destination device address
+    cmd[3] = KNX_ConvertByte(knxDeviceAddress[0], knxDeviceAddress[1]);
+    cmd[4] = KNX_ConvertByte(knxDeviceAddress[2], knxDeviceAddress[3]);
 
     cmd[5] = 0xE1;
     cmd[6] = 0x00;
@@ -200,6 +206,15 @@ bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
     }
 
     Serial.flush();
+
+    if (SYSCONFIG.mqttEnable)
+    {
+        char msg[100];
+        bytes_to_char(cmd, 9, msg);
+        char log[200];
+        snprintf_P(log, sizeof(log), "TX >> [%s]", msg);
+        MQTT_Publish(TOPIC_BUS, log);
+    }
 
     //char log[200];
     //bytes_to_char(cmd, 9, log);
