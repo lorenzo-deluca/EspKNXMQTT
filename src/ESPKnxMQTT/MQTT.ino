@@ -72,12 +72,12 @@ void MQTT_Reconnect()
 		WriteLog(LOG_LEVEL_DEBUG, "Attempting MQTT connection...");
 
 		// Provo a connettermi al server MQTT
-		if (_MQTTClient.connect(mqtt_device, MQTT_USER, MQTT_PASSWORD))
+		if (_MQTTClient.connect(MQTT_DEVICE_ID, MQTT_USER, MQTT_PASSWORD))
 		{
 			RUNTIME.mqttConnected = true;
 
 			char Log[250];
-			snprintf_P(Log, sizeof(Log), "%s ONLINE - IP %s", mqtt_device, WiFi.localIP().toString().c_str());
+			snprintf_P(Log, sizeof(Log), "%s ONLINE - IP %s", MQTT_DEVICE_ID, WiFi.localIP().toString().c_str());
 			WriteLog(LOG_LEVEL_INFO, Log);
 
 			// subscribe TOPIC_CMD => command from master

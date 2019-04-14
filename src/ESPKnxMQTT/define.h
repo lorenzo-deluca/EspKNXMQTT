@@ -38,6 +38,9 @@ struct _syscfgType
 
     int serialLogLevel;
     int mqttLogLevel;
+    
+    char mqtt_server[40];
+    char mqtt_port[6];
 };
 
 struct _runtimeType
@@ -48,14 +51,12 @@ struct _runtimeType
     bool wiFiConnected;
     
     bool KnxGateInit;
-
     bool mqttDiscoveryEnabled;
 };
 
 // command list struct
 #define CMD_LIST_IMPLEMENTATION FIFO
-#define CMD_LIST_SIZE 20
-
+#define CMD_LIST_SIZE           32
 #define KNX_DEVICE_ADDRESS_SIZE 5
 
 enum LoggingLevels
@@ -83,15 +84,17 @@ struct _command
 };
 
 // WIFI
-#define wifi_ssid "WiFiLDL_iOT"
-#define wifi_password "pswiOT2017!"
+#ifndef APSSID
+#define APSSID "ESPKnxMQTT_ap"
+#define APPSK "12345678"
+#endif
 
 // MQTT
 #define MQTT_SERVER "192.168.8.2"
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
-#define mqtt_device "EspKnxMQTT"
+#define MQTT_DEVICE_ID "EspKnxMQTT"
 
 // MQTT Topics
 #define TOPIC_PREFIX ""
@@ -105,7 +108,7 @@ struct _command
 #define TOPIC_SWITCH_STATE "knxhome/switch/state"
 #define TOPIC_DISCOVERY "homeassistant/switch/%s/config"
 
-#define LOOP_INTERVAL_MILLISEC 250
+#define LOOP_INTERVAL_MILLISEC 120
 
 #define D_PROGRAMNAME "EspKnxMQTT"
 #define D_AUTHOR "Lorenzo De Luca"

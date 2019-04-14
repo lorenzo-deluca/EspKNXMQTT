@@ -24,9 +24,9 @@
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include <PubSubClient.h> // https://github.com/knolleary/pubsubclient
-#include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
-#include <cppQueue.h>	 // https://github.com/SMFSW/Queue
+#include <PubSubClient.h> 	// https://github.com/knolleary/pubsubclient
+#include <WiFiManager.h>	// https://github.com/tzapu/WiFiManager
+#include <cppQueue.h>	 	// https://github.com/SMFSW/Queue
 
 extern "C"
 {
@@ -38,56 +38,39 @@ extern "C"
 
 // runtime data
 _runtimeType RUNTIME = {
-	false, // mqttConnected
-	false, // wiFiConnected
-	false, // KnxGateInit
-	false  // mqttDiscoveryEnabled
+	false, 			// mqttConnected
+	false, 			// wiFiConnected
+	false, 			// KnxGateInit
+	false 	 		// mqttDiscoveryEnabled
 };
 
 // initial default config
 _syscfgType SYSCONFIG = {
-	CONFIG_VERSION,
-	false,
-	true,
-	true,
-	LOG_LEVEL_ERROR,
-	LOG_LEVEL_ALL};
-
-/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
-
-/* Set these to your desired softAP credentials. They are not configurable at runtime */
-#ifndef APSSID
-#define APSSID "ESPKnxMQTT_ap"
-#define APPSK "12345678"
-#endif
-
-char mqtt_server[40] = "";
-char mqtt_port[6] = "1883";
-
-/** Should I connect to WLAN asap? */
-boolean connect;
-
-/** Last time I tried to connect to WLAN */
-unsigned long lastConnectTry = 0;
-
-/** Current WLAN status */
-unsigned int status = WL_IDLE_STATUS;
-
-/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+	CONFIG_VERSION, 	// version
+	false, 				// networkConfig
+	true, 				// mqttEnable
+	true, 				// mqttUpdateEnable
+	LOG_LEVEL_ERROR, 	// serialLogLevel
+	LOG_LEVEL_ALL,		// mqttLogLevel
+	"",					// mqtt_server
+	"1883"				// mqtt_port
+	};
 
 WiFiClient _WiFiClient;
 PubSubClient _MQTTClient(_WiFiClient);
 
 // Timer loop from http://www.arduino.cc/en/Tutorial/BlinkWithoutDelayS
 long previousMillis = 0;
+unsigned long lastConnectTry = 0;
 
 // Instantiate command queue
 Queue commandList(sizeof(_command), CMD_LIST_SIZE, CMD_LIST_IMPLEMENTATION);
 
 WiFiManager wifiManager;
 
-WiFiManagerParameter custom_mqtt_server("mqtt_server", "mqtt server", mqtt_server, 40);
-WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, 6);
+// Add parameters to WiFiManager
+WiFiManagerParameter custom_mqtt_server("mqtt_server", "mqtt server", SYSCONFIG.mqtt_server, 40);
+WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", SYSCONFIG.mqtt_port, 6);	
 
 void setup()
 {
@@ -123,7 +106,7 @@ void setup()
 		Serial.println("Forced AP mode");
 	}
 	Serial.setTimeout(1000);
-	
+
 	wifiManager.addParameter(&custom_mqtt_server);
 	wifiManager.addParameter(&custom_mqtt_port);
 	wifiManager.setSaveConfigCallback(saveConfigCallback);
@@ -133,16 +116,10 @@ void setup()
 	//if you get here you have connected to the WiFi
 	WriteLog(LOG_LEVEL_DEBUG, "WiFi connected - IPv4 =");
     WriteLog(LOG_LEVEL_DEBUG, WiFi.localIP().toString().c_str());
-
-	//read updated parameters
-	strcpy(mqtt_server, custom_mqtt_server.getValue());
-	strcpy(mqtt_port, custom_mqtt_port.getValue());
-
-	Serial.println(mqtt_server);
-	Serial.println(mqtt_port);
 	
 	// 
 	RUNTIME.Configured = Configuration_Load(); 
+	lastConnectTry = millis();
 
 	// load configuration
 	if (RUNTIME.Configured)
@@ -150,20 +127,21 @@ void setup()
 		WriteLog(LOG_LEVEL_DEBUG, "LoadConfig OK");
 
 		// startup Wifi Connection
-		// RUNTIME.wiFiConnected = WiFi_ClientMode();
 		RUNTIME.wiFiConnected = true;
 
 		// configure MQTT
-		_MQTTClient.setServer(mqtt_server, MQTT_PORT);
+		_MQTTClient.setServer(SYSCONFIG.mqtt_server, MQTT_PORT);
 		_MQTTClient.setCallback(MQTT_Callback);
 	}
 	else
 	{
-		WriteLog(LOG_LEVEL_ERROR, "LoadConfig Error");
-
-		//if(WiFi_APMode()) {
-		//	WebServer_StartCaptivePortal();
-		//}
+		WriteLog(LOG_LEVEL_ERROR, "LoadConfig NOK");
+		wifiManager.resetSettings();
+		
+		delay(3000);
+		//reset and try again, or maybe put it to deep sleep
+		ESP.reset();
+		delay(5000);
 	}
 }
 
@@ -172,9 +150,24 @@ void loop()
 	//
 	// code life cycle
 	//
-
-	if (!RUNTIME.Configured)
+	if(!RUNTIME.Configured)
 		return;
+	
+    unsigned int s = WiFi.status();
+
+	if (s == 0 && millis() > (lastConnectTry + 60000)) {
+      /* If WLAN disconnected and idle try to connect */
+      /* Don't set retry time too low as retry interfere the softAP operation */
+	  lastConnectTry = millis();
+      wifiManager.autoConnect();
+    }
+
+	RUNTIME.wiFiConnected = (s == WL_CONNECTED);
+
+	if (!RUNTIME.wiFiConnected)
+		return;
+
+	// WIFI Connected
 
 	MQTT_Loop();
 

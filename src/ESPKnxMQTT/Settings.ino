@@ -19,46 +19,60 @@
 
 #include <EEPROM.h>
 
+void storeStruct(void *data_source, size_t size)
+{
+  EEPROM.begin(size * 2);
+  for(size_t i = 0; i < size; i++)
+  {
+    char data = ((char *)data_source)[i];
+    EEPROM.write(i, data);
+  }
+  EEPROM.commit();
+}
+
+void loadStruct(void *data_dest, size_t size)
+{
+    EEPROM.begin(size * 2);
+    for(size_t i = 0; i < size; i++)
+    {
+        char data = EEPROM.read(i);
+        ((char *)data_dest)[i] = data;
+    }
+}
+
 //callback notifying us of the need to save config
 void saveConfigCallback () {
-  	Serial.println("Should save config");
+  	
+	WriteLog(LOG_LEVEL_INFO, "saveConfigCallback");
 
-	  //read updated parameters
-	strcpy(mqtt_server, custom_mqtt_server.getValue());
-	strcpy(mqtt_port, custom_mqtt_port.getValue());
+	strcpy(SYSCONFIG.mqtt_server, custom_mqtt_server.getValue());
+	strcpy(SYSCONFIG.mqtt_port, custom_mqtt_port.getValue());
 
-	Serial.println(mqtt_server);
-	Serial.println(mqtt_port);
-	
-
+	storeStruct(&SYSCONFIG, sizeof(SYSCONFIG));
+		
+	Serial.println("saveConfigCallback - end");
 }
 
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
-bool Configuration_Load()
+bool Configuration_Load() 
 {
-	return true; // DA ELIMINARE
+	Serial.println("Configuration_Load");
 
-	// is it correct?
-	if (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
-		EEPROM.read(CONFIG_START + 1) == CONFIG_VERSION[1] &&
-		EEPROM.read(CONFIG_START + 2) == CONFIG_VERSION[2] &&
-		EEPROM.read(CONFIG_START + 3) == CONFIG_VERSION[3] &&
-		EEPROM.read(CONFIG_START + 4) == CONFIG_VERSION[4])
+	_syscfgType settings;
+
+    // Carico nella struttura temporanea
+    loadStruct(&settings, sizeof(settings));
+
+	if(memcmp(settings.version, CONFIG_VERSION, 6) == 0) 
 	{
-		// load (overwrite) the local configuration struct
-		for (unsigned int i = 0; i < sizeof(SYSCONFIG); i++)
-		{
-			*((char *)&SYSCONFIG + i) = EEPROM.read(CONFIG_START + i);
-		}
+        memcpy(&SYSCONFIG, &settings, sizeof(SYSCONFIG));
+		
+		Serial.println("Configuration_Load - OK");
 		return true; // return 1 if config loaded
 	}
-	return false; // return 0 if config NOT loaded
-}
-
-
-// save the CONFIGURATION in to EEPROM
-void Configuration_Save()
-{
-	for (unsigned int i = 0; i < sizeof(SYSCONFIG); i++)
-		EEPROM.write(CONFIG_START + i, *((char *)&SYSCONFIG + i));
+	else
+	{
+		Serial.println("Configuration_Load - NOK");
+		return false; // return 0 if config NOT loaded
+	}
 }
