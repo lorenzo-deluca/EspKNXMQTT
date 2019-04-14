@@ -19,12 +19,24 @@
 
 #include <EEPROM.h>
 
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  	Serial.println("Should save config");
+
+	  //read updated parameters
+	strcpy(mqtt_server, custom_mqtt_server.getValue());
+	strcpy(mqtt_port, custom_mqtt_port.getValue());
+
+	Serial.println(mqtt_server);
+	Serial.println(mqtt_port);
+	
+
+}
 
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
 bool Configuration_Load()
 {
-	return 1; // DA ELIMINARE
-
+	return true; // DA ELIMINARE
 
 	// is it correct?
 	if (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
@@ -38,9 +50,9 @@ bool Configuration_Load()
 		{
 			*((char *)&SYSCONFIG + i) = EEPROM.read(CONFIG_START + i);
 		}
-		return 1; // return 1 if config loaded
+		return true; // return 1 if config loaded
 	}
-	return 0; // return 0 if config NOT loaded
+	return false; // return 0 if config NOT loaded
 }
 
 

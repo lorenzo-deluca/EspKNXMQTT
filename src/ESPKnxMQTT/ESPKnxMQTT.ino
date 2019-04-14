@@ -61,26 +61,8 @@ _syscfgType SYSCONFIG = {
 #define APPSK "12345678"
 #endif
 
-const char *softAP_ssid = APSSID;
-const char *softAP_password = APPSK;
-
-/* hostname for mDNS. Should work at least on windows. Try http://esp8266.local */
-const char *myHostname = "ESPKnxMQTT";
-
-/* Don't set this wifi credentials. They are configurated at runtime and stored on EEPROM */
-char ssid[32] = "";
-char password[32] = "";
-
-// DNS server
-const byte DNS_PORT = 53;
-DNSServer dnsServer;
-
-// Web server
-ESP8266WebServer server(80);
-
-/* Soft AP network parameters */
-IPAddress apIP(192, 168, 4, 1);
-IPAddress netMsk(255, 255, 255, 0);
+char mqtt_server[40] = "";
+char mqtt_port[6] = "1883";
 
 /** Should I connect to WLAN asap? */
 boolean connect;
@@ -101,6 +83,11 @@ long previousMillis = 0;
 
 // Instantiate command queue
 Queue commandList(sizeof(_command), CMD_LIST_SIZE, CMD_LIST_IMPLEMENTATION);
+
+WiFiManager wifiManager;
+
+WiFiManagerParameter custom_mqtt_server("mqtt_server", "mqtt server", mqtt_server, 40);
+WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, 6);
 
 void setup()
 {
@@ -125,7 +112,36 @@ void setup()
 	digitalWrite(0, LOW); // A0 OUTPUT BASSO
 	delay(10);
 
-	// if AP jumper force AP mode
+	Serial.println("Startup");
+	Serial.println("Press A for start as AP");
+	Serial.setTimeout(10000);
+	char serin[4];
+	Serial.readBytes(serin,1);
+	if ((serin[0] == 'A') || (serin[0] == 'a')) 
+	{
+		wifiManager.resetSettings();
+		Serial.println("Forced AP mode");
+	}
+	Serial.setTimeout(1000);
+	
+	wifiManager.addParameter(&custom_mqtt_server);
+	wifiManager.addParameter(&custom_mqtt_port);
+	wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+	wifiManager.autoConnect(APSSID, APPSK);
+
+	//if you get here you have connected to the WiFi
+	WriteLog(LOG_LEVEL_DEBUG, "WiFi connected - IPv4 =");
+    WriteLog(LOG_LEVEL_DEBUG, WiFi.localIP().toString().c_str());
+
+	//read updated parameters
+	strcpy(mqtt_server, custom_mqtt_server.getValue());
+	strcpy(mqtt_port, custom_mqtt_port.getValue());
+
+	Serial.println(mqtt_server);
+	Serial.println(mqtt_port);
+	
+	// 
 	RUNTIME.Configured = Configuration_Load(); 
 
 	// load configuration
@@ -134,17 +150,20 @@ void setup()
 		WriteLog(LOG_LEVEL_DEBUG, "LoadConfig OK");
 
 		// startup Wifi Connection
-		RUNTIME.wiFiConnected = WiFi_ClientMode();
+		// RUNTIME.wiFiConnected = WiFi_ClientMode();
+		RUNTIME.wiFiConnected = true;
 
 		// configure MQTT
-		_MQTTClient.setServer(MQTT_SERVER, MQTT_PORT);
+		_MQTTClient.setServer(mqtt_server, MQTT_PORT);
 		_MQTTClient.setCallback(MQTT_Callback);
 	}
 	else
 	{
 		WriteLog(LOG_LEVEL_ERROR, "LoadConfig Error");
 
-		WiFi_APMode();
+		//if(WiFi_APMode()) {
+		//	WebServer_StartCaptivePortal();
+		//}
 	}
 }
 
@@ -154,31 +173,31 @@ void loop()
 	// code life cycle
 	//
 
-	if (RUNTIME.Configured)
+	if (!RUNTIME.Configured)
+		return;
+
+	MQTT_Loop();
+
+	if (RUNTIME.mqttConnected)
 	{
-		MQTT_Loop();
-
-		if (RUNTIME.mqttConnected)
+		// initialize gate
+		if (!RUNTIME.KnxGateInit)
+			RUNTIME.KnxGateInit = KNX_Init();
+		else
 		{
-			// initialize gate
-			if (!RUNTIME.KnxGateInit)
-				RUNTIME.KnxGateInit = KNX_Init();
-			else
+			// current millisec
+			unsigned long currentMillis = millis();
+
+			if (currentMillis - previousMillis >= LOOP_INTERVAL_MILLISEC)
 			{
-				// current millisec
-				unsigned long currentMillis = millis();
+				KNX_Loop();
 
-				if (currentMillis - previousMillis >= LOOP_INTERVAL_MILLISEC)
-				{
-					KNX_Loop();
-
-					// save last exec
-					previousMillis = currentMillis;
-				}
+				// save last exec
+				previousMillis = currentMillis;
 			}
 		}
 	}
 
 	// webserver stuff
-	WebServer_Loop();
+	// WebServer_Loop();
 }
