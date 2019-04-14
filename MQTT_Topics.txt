@@ -1,0 +1,6 @@
+DISCOVERY TOPIC {DiscoveryTopic} = "homeassistant"
+BASE TOPIC		{BaseTopic} 	 = "knxhome"
+
+CONFIG TOPIC 	{DiscoveryTopic}/switch/<KNXAddress>/config
+CONFIG PAYLOAD 	{"name": "<KNXAddress>", "command_topic": "{BaseTopic}/switch/<KNXAddress>/set", "state_topic":"{BaseTopic}/switch/<KNXAddress>/state"}
+

@@ -19,6 +19,16 @@
 
 #include "./define.h"
 
+void MQTT_Loop()
+{
+	// in case of mqtt disconnect
+	if (!_MQTTClient.connected())
+		MQTT_Reconnect();
+
+	// loop mqtt client
+	_MQTTClient.loop();
+}
+
 String getValue(String data, char separator, int index)
 {
 	int found = 0;
@@ -64,10 +74,11 @@ void MQTT_Reconnect()
 		// Provo a connettermi al server MQTT
 		if (_MQTTClient.connect(mqtt_device, MQTT_USER, MQTT_PASSWORD))
 		{
-			WriteLog(LOG_LEVEL_DEBUG, "connected");
 			RUNTIME.mqttConnected = true;
 
-			WriteLog(LOG_LEVEL_INFO, "EspKnxMQTT ONLINE!");
+			char Log[250];
+			snprintf_P(Log, sizeof(Log), "%s ONLINE - IP %s", mqtt_device, WiFi.localIP().toString().c_str());
+			WriteLog(LOG_LEVEL_INFO, Log);
 
 			// subscribe TOPIC_CMD => command from master
 			_MQTTClient.subscribe(TOPIC_CMD);

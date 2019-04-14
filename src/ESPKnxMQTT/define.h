@@ -42,11 +42,21 @@ struct _syscfgType
 
 struct _runtimeType
 {
+    bool Configured;
+
     bool mqttConnected;
     bool wiFiConnected;
+    
     bool KnxGateInit;
+
     bool mqttDiscoveryEnabled;
 };
+
+// command list struct
+#define CMD_LIST_IMPLEMENTATION FIFO
+#define CMD_LIST_SIZE 20
+
+#define KNX_DEVICE_ADDRESS_SIZE 5
 
 enum LoggingLevels
 {
@@ -65,12 +75,6 @@ enum commandType
     CMD_TYPE_UP,
     CMD_TYPE_DOWN
 };
-
-// command list struct
-#define CMD_LIST_IMPLEMENTATION FIFO
-#define CMD_LIST_SIZE 20
-
-#define KNX_DEVICE_ADDRESS_SIZE 5
 
 struct _command
 {

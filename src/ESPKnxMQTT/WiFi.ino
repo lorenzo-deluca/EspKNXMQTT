@@ -38,12 +38,32 @@ char *string2char(String command)
         return NULL;
 }
 
-bool WiFi_Startup()
+bool WiFi_APMode()
 {
-    delay(10);
+    delay(1000);
+
+    Serial.println("Configuring access point...");
+
+    /* You can remove the password parameter if you want the AP to be open. */
+    WiFi.softAPdisconnect();
+    WiFi.disconnect();
+  
+    WiFi.mode(WIFI_AP);
+   // WiFi.softAPConfig(apIP, apIP, netMsk);
+    WiFi.softAP(softAP_ssid, softAP_password);
+
+    delay(500); // Without delay I've seen the IP address blank
+    Serial.print("AP IP address: ");
+    Serial.println(WiFi.softAPIP());
+
+    return true;
+}
+
+bool WiFi_ClientMode()
+{
+    delay(1000);
 
     char Log[250];
-
     snprintf_P(Log, sizeof(Log), "Connecting to %s", wifi_ssid);
     WriteLog(LOG_LEVEL_DEBUG, Log);
 
@@ -59,7 +79,20 @@ bool WiFi_Startup()
     randomSeed(micros());
 
     WriteLog(LOG_LEVEL_DEBUG, "WiFi connected - IPv4 =");
-    WriteLog(LOG_LEVEL_DEBUG, string2char(IpAddress2String(WiFi.localIP())));
+    //WriteLog(LOG_LEVEL_DEBUG, string2char(IpAddress2String(WiFi.localIP())));
+    WriteLog(LOG_LEVEL_DEBUG, WiFi.localIP().toString().c_str());
 
+    /*
+    if (!MDNS.begin(myHostname))
+    {
+        WriteLog(LOG_LEVEL_DEBUG, "Error setting up MDNS responder!");
+    }
+    else
+    {
+        WriteLog(LOG_LEVEL_DEBUG, "mDNS responder started");
+        // Add service to MDNS-SD
+       
+    }
+*/
     return true;
 }

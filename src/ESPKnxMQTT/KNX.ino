@@ -110,25 +110,32 @@ bool KNX_Send(char ch, bool waitresponse = false, bool trace = true, int millsde
 
 bool KNX_Init()
 {
+    //
+    KNX_Send("@q", true);
+
     // set led lamps
-    KNX_Send("@", true);
+    KNX_Send("@");
 
     // set led lamps low-freq (client mode)
-    KNX_Send((char)0xF0, true);
+    KNX_Send((char)0xF0);
 
     // Set KNXgate hex mode
-    KNX_Send("@MX", true);
+    KNX_Send("@MX");
 
-    KNX_Send("@A0", true);
+    // clear @A filter
+    KNX_Send("@A0");
 
-    KNX_Send("@B0", true);
+    // clear @B filter
+    KNX_Send("@B0");
 
-    KNX_Send("@F2", true);
+    // filter ACK messages
+    KNX_Send("@F2");
 
-    KNX_Send("@c", true);
+    //
+    KNX_Send("@c");
 
     // clear SCSgate/KNXgate buffer
-    KNX_Send("@b", true);
+    KNX_Send("@b");
 
     Serial.setTimeout(10); // timeout is 10mS
 
@@ -161,6 +168,12 @@ byte KNX_ConvertByte(char cByte_1, char cByte_2)
     bByte = byte(strtol(addr, NULL, 16));
 
     return bByte;
+}
+
+bool KNX_SendCommand(byte command[], int len)
+{
+
+    return true;
 }
 
 bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
@@ -215,10 +228,6 @@ bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
         snprintf_P(log, sizeof(log), "TX >> [%s]", msg);
         MQTT_Publish(TOPIC_BUS, log);
     }
-
-    //char log[200];
-    //bytes_to_char(cmd, 9, log);
-    //WriteLog(LOG_LEVEL_DEBUG, cmd);
 
     char mqtt_data[200];
     char mqtt_topic[200];
@@ -303,4 +312,20 @@ void KNX_ReadBus()
             MQTT_Publish(mqtt_topic, mqtt_data);
         }
     }
+}
+
+void KNX_Loop()
+{
+
+    // check
+    for (int i = 0; i < commandList.getCount(); i++)
+    {
+        _command cmd;
+        commandList.pop(&cmd);
+
+        KNX_ExeCommand(cmd.knxDeviceAddress, cmd.cmdType);
+    }
+
+    // read bus
+    KNX_ReadBus();
 }

@@ -21,8 +21,11 @@
 
 
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
-int Configuration_Load()
+bool Configuration_Load()
 {
+	return 1; // DA ELIMINARE
+
+
 	// is it correct?
 	if (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
 		EEPROM.read(CONFIG_START + 1) == CONFIG_VERSION[1] &&
