@@ -70,7 +70,7 @@ WiFiManager wifiManager;
 
 // Add parameters to WiFiManager
 WiFiManagerParameter custom_mqtt_server("mqtt_server", "mqtt server", SYSCONFIG.mqtt_server, 40);
-WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", SYSCONFIG.mqtt_port, 6);	
+WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", SYSCONFIG.mqtt_port, 6);
 
 void setup()
 {
@@ -79,12 +79,13 @@ void setup()
 	pinMode(0, OUTPUT);
 
 	// aspetta 15 secondi perche' con l'assorbimento iniziale di corrente esp8266 fa disconnettere l'adattatore seriale
-	//	int pauses = 0;
-	//	while (pauses < 150) // 15 secondi wait
-	//	{
-	//		pauses++;
-	//		delay(100); // wait 100ms
-	//	}
+	//	
+	int pauses = 0;
+	while (pauses < 150) // 15 secondi wait
+	{
+		pauses++;
+		delay(100); // wait 100ms
+	}
 
 	Serial.begin(115200);
 	while (!Serial)
@@ -95,37 +96,37 @@ void setup()
 	digitalWrite(0, LOW); // A0 OUTPUT BASSO
 	delay(10);
 
-	Serial.println("Startup");
+	// 
+	RUNTIME.Configured = Configuration_Load();
+
+	wifiManager.addParameter(&custom_mqtt_server);
+	wifiManager.addParameter(&custom_mqtt_port);
+	wifiManager.setSaveConfigCallback(saveConfigCallback);
+	// wifiManager.setDebugOutput(false);
+
 	Serial.println("Press A for start as AP");
 	Serial.setTimeout(10000);
 	char serin[4];
 	Serial.readBytes(serin,1);
 	if ((serin[0] == 'A') || (serin[0] == 'a')) 
 	{
-		wifiManager.resetSettings();
+		// wifiManager.resetSettings();
+		wifiManager.startConfigPortal(APSSID, APPSK);
 		Serial.println("Forced AP mode");
 	}
 	Serial.setTimeout(1000);
-
-	wifiManager.addParameter(&custom_mqtt_server);
-	wifiManager.addParameter(&custom_mqtt_port);
-	wifiManager.setSaveConfigCallback(saveConfigCallback);
-
+	
 	wifiManager.autoConnect(APSSID, APPSK);
 
 	//if you get here you have connected to the WiFi
-	WriteLog(LOG_LEVEL_DEBUG, "WiFi connected - IPv4 =");
-    WriteLog(LOG_LEVEL_DEBUG, WiFi.localIP().toString().c_str());
+	WriteLog(LOG_LEVEL_INFO, "WiFi connected - IPv4 =");
+    WriteLog(LOG_LEVEL_INFO, WiFi.localIP().toString().c_str());
 	
-	// 
-	RUNTIME.Configured = Configuration_Load(); 
 	lastConnectTry = millis();
 
 	// load configuration
 	if (RUNTIME.Configured)
 	{
-		WriteLog(LOG_LEVEL_DEBUG, "LoadConfig OK");
-
 		// startup Wifi Connection
 		RUNTIME.wiFiConnected = true;
 
@@ -156,10 +157,10 @@ void loop()
     unsigned int s = WiFi.status();
 
 	if (s == 0 && millis() > (lastConnectTry + 60000)) {
-      /* If WLAN disconnected and idle try to connect */
-      /* Don't set retry time too low as retry interfere the softAP operation */
-	  lastConnectTry = millis();
-      wifiManager.autoConnect();
+		/* If WLAN disconnected and idle try to connect */
+		/* Don't set retry time too low as retry interfere the softAP operation */
+		lastConnectTry = millis();
+		wifiManager.autoConnect();
     }
 
 	RUNTIME.wiFiConnected = (s == WL_CONNECTED);

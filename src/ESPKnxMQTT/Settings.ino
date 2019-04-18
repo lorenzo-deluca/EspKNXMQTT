@@ -51,13 +51,14 @@ void saveConfigCallback () {
 	storeStruct(&SYSCONFIG, sizeof(SYSCONFIG));
 		
 	Serial.println("saveConfigCallback - end");
+
+	delay(1000);
+	ESP.restart();
 }
 
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
-bool Configuration_Load() 
+bool Configuration_Read() 
 {
-	Serial.println("Configuration_Load");
-
 	_syscfgType settings;
 
     // Carico nella struttura temporanea
@@ -66,13 +67,24 @@ bool Configuration_Load()
 	if(memcmp(settings.version, CONFIG_VERSION, 6) == 0) 
 	{
         memcpy(&SYSCONFIG, &settings, sizeof(SYSCONFIG));
-		
-		Serial.println("Configuration_Load - OK");
 		return true; // return 1 if config loaded
 	}
 	else
 	{
-		Serial.println("Configuration_Load - NOK");
 		return false; // return 0 if config NOT loaded
 	}
+}
+
+bool Configuration_Load()
+{
+	if(!Configuration_Read())
+	{
+		WriteLog(LOG_LEVEL_ERROR, "LoadConfig NOK");
+		return false;
+	}
+
+	new (&custom_mqtt_server) WiFiManagerParameter("mqtt_server", "mqtt server", SYSCONFIG.mqtt_server, 40);
+
+	WriteLog(LOG_LEVEL_INFO, "LoadConfig OK");
+	return true;
 }
