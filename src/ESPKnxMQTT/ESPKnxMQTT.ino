@@ -47,14 +47,22 @@ _runtimeType RUNTIME = {
 // initial default config
 _syscfgType SYSCONFIG = {
 	CONFIG_VERSION, 	// version
-	false, 				// networkConfig
 	true, 				// mqttEnable
 	true, 				// mqttUpdateEnable
+	true,				// webServerEnable
 	LOG_LEVEL_ERROR, 	// serialLogLevel
 	LOG_LEVEL_ALL,		// mqttLogLevel
-	"",					// mqtt_server
-	"1883"				// mqtt_port
-	};
+	
+	"",					// mqtt_server[20]
+	"1883",				// mqtt_port[6]
+	"",					// mqtt_user[8]
+	"", 				// mqtt_password[10]
+   
+	false,				// static_cfg
+	"",					// static_ip[];
+	"",					// static_mask[];
+	""					// static_gtw[];
+};
 
 WiFiClient _WiFiClient;
 PubSubClient _MQTTClient(_WiFiClient);
@@ -69,8 +77,14 @@ Queue commandList(sizeof(_command), CMD_LIST_SIZE, CMD_LIST_IMPLEMENTATION);
 WiFiManager wifiManager;
 
 // Add parameters to WiFiManager
-WiFiManagerParameter custom_mqtt_server("mqtt_server", "mqtt server", SYSCONFIG.mqtt_server, 40);
-WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", SYSCONFIG.mqtt_port, 6);
+WiFiManagerParameter cfg_mqtt_server	("mqtt_server", "mqtt server", SYSCONFIG.mqtt_server, 20);
+WiFiManagerParameter cfg_mqtt_port		("mqtt_port", "mqtt port", SYSCONFIG.mqtt_port, 6);
+WiFiManagerParameter cfg_mqtt_user		("mqtt_user", "mqtt user", SYSCONFIG.mqtt_user, 8);
+WiFiManagerParameter cfg_mqtt_password	("mqtt_password", "mqtt password", SYSCONFIG.mqtt_password, 10);
+
+WiFiManagerParameter cfg_static_ip		("static_ip", "static ip", SYSCONFIG.static_ip, IP_ADDRESS_LEN);
+WiFiManagerParameter cfg_static_mask	("static_mask", "static mask", SYSCONFIG.static_mask, IP_ADDRESS_LEN);
+WiFiManagerParameter cfg_static_gtw		("static_gtw", "static gtw", SYSCONFIG.static_gtw, IP_ADDRESS_LEN);
 
 void setup()
 {
@@ -78,13 +92,13 @@ void setup()
 	pinMode(2, INPUT);
 	pinMode(0, OUTPUT);
 
-	// aspetta 15 secondi perche' con l'assorbimento iniziale di corrente esp8266 fa disconnettere l'adattatore seriale
-	//	
+	// 
+	//	10 seconds wait
 	int pauses = 0;
-	while (pauses < 150) // 15 secondi wait
+	while (pauses < 100) 
 	{
 		pauses++;
-		delay(100); // wait 100ms
+		delay(100);
 	}
 
 	Serial.begin(115200);
@@ -96,28 +110,31 @@ void setup()
 	digitalWrite(0, LOW); // A0 OUTPUT BASSO
 	delay(10);
 
-	// 
+	// Load configuration from EEPROM
 	RUNTIME.Configured = Configuration_Load();
 
-	wifiManager.addParameter(&custom_mqtt_server);
-	wifiManager.addParameter(&custom_mqtt_port);
-	wifiManager.setSaveConfigCallback(saveConfigCallback);
-	// wifiManager.setDebugOutput(false);
+	// config WiFi Manger
+	WiFiManager_Setup();
 
-	Serial.println("Press A for start as AP");
-	Serial.setTimeout(10000);
-	char serin[4];
-	Serial.readBytes(serin,1);
-	if ((serin[0] == 'A') || (serin[0] == 'a')) 
+	// 
+ 	pinMode(2, INPUT);
+	if (digitalRead(2) == 0) 
 	{
 		// wifiManager.resetSettings();
 		wifiManager.startConfigPortal(APSSID, APPSK);
-		Serial.println("Forced AP mode");
+		WriteLog(LOG_LEVEL_INFO, "Forced AP mode - reset WifiManager Settings");
 	}
-	Serial.setTimeout(1000);
+	else
+	{
+		WiFi.disconnect();
+		Serial.setTimeout(1000);
+		if (!wifiManager.autoConnect(APSSID, APPSK))
+		{
+			delay(3000);
+			ESP.restart();
+		}
+	}
 	
-	wifiManager.autoConnect(APSSID, APPSK);
-
 	//if you get here you have connected to the WiFi
 	WriteLog(LOG_LEVEL_INFO, "WiFi connected - IPv4 =");
     WriteLog(LOG_LEVEL_INFO, WiFi.localIP().toString().c_str());
@@ -131,18 +148,14 @@ void setup()
 		RUNTIME.wiFiConnected = true;
 
 		// configure MQTT
-		_MQTTClient.setServer(SYSCONFIG.mqtt_server, MQTT_PORT);
+		_MQTTClient.setServer(SYSCONFIG.mqtt_server, atoi(SYSCONFIG.mqtt_port));
 		_MQTTClient.setCallback(MQTT_Callback);
 	}
 	else
 	{
-		WriteLog(LOG_LEVEL_ERROR, "LoadConfig NOK");
-		wifiManager.resetSettings();
-		
-		delay(3000);
-		//reset and try again, or maybe put it to deep sleep
-		ESP.reset();
-		delay(5000);
+		WriteLog(LOG_LEVEL_ERROR, "LoadConfig NOK - Start AP Mode");
+
+		wifiManager.startConfigPortal(APSSID, APPSK);
 	}
 }
 
@@ -156,7 +169,8 @@ void loop()
 	
     unsigned int s = WiFi.status();
 
-	if (s == 0 && millis() > (lastConnectTry + 60000)) {
+	if (s == 0 && millis() > (lastConnectTry + 30000)) 
+	{
 		/* If WLAN disconnected and idle try to connect */
 		/* Don't set retry time too low as retry interfere the softAP operation */
 		lastConnectTry = millis();
@@ -169,7 +183,6 @@ void loop()
 		return;
 
 	// WIFI Connected
-
 	MQTT_Loop();
 
 	if (RUNTIME.mqttConnected)
@@ -190,6 +203,8 @@ void loop()
 				previousMillis = currentMillis;
 			}
 		}
+
+
 	}
 
 	// webserver stuff

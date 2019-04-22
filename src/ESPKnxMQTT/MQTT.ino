@@ -29,7 +29,7 @@ void MQTT_Loop()
 	_MQTTClient.loop();
 }
 
-String getValue(String data, char separator, int index)
+String getValueSeparator(String data, char separator, int index)
 {
 	int found = 0;
 	int strIndex[] = {0, -1};
@@ -142,7 +142,7 @@ void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 			receivedCommand.cmdType = CMD_TYPE_OFF;
 
 		// knx device address request
-		String value1 = getValue(received_topic, '/', 3);
+		String value1 = getValueSeparator(received_topic, '/', 3);
 
 		// copy knx device address
 		memcpy(receivedCommand.knxDeviceAddress, value1.c_str(), 4);
@@ -150,18 +150,5 @@ void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 
 		// push in command queue
 		commandList.push(&receivedCommand);
-	}
-}
-
-void WriteLog(int msgLevel, const char *msgLog)
-{
-	if (SYSCONFIG.serialLogLevel >= msgLevel)
-		Serial.println(msgLog);
-
-	if (SYSCONFIG.mqttLogLevel >= msgLevel)
-	{
-		char Log[250];
-		snprintf_P(Log, sizeof(Log), "%lu - %s", millis(), msgLog);
-		MQTT_Publish(TOPIC_LOG, msgLog);
 	}
 }

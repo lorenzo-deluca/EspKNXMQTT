@@ -20,27 +20,34 @@
 #ifndef _MY_HEADER_H
 #define _MY_HEADER_H
 
-
 // configuration version
 #define CONFIG_VERSION "CFG01"
 
-// where in EEPROM
-#define CONFIG_START 32
+#define IP_ADDRESS_LEN 16
 
 struct _syscfgType
 {
     // configuration version
     char version[6];
 
-    bool networkConfig;
     bool mqttEnable;
     bool mqttUpdateEnable;
+    bool webServerEnable;
 
     int serialLogLevel;
     int mqttLogLevel;
     
-    char mqtt_server[40];
+    // mqtt configuration
+    char mqtt_server[20];
     char mqtt_port[6];
+    char mqtt_user[8];
+    char mqtt_password[10];
+    
+    // optional static ip configuration
+    bool static_cfg;
+    char static_ip[IP_ADDRESS_LEN];
+    char static_mask[IP_ADDRESS_LEN];
+    char static_gtw[IP_ADDRESS_LEN];
 };
 
 struct _runtimeType
@@ -90,7 +97,6 @@ struct _command
 #endif
 
 // MQTT
-#define MQTT_SERVER "192.168.8.2"
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
@@ -112,5 +118,6 @@ struct _command
 
 #define D_PROGRAMNAME "EspKnxMQTT"
 #define D_AUTHOR "Lorenzo De Luca"
+
 
 #endif
