@@ -66,6 +66,8 @@ void MQTT_Publish(const char *topic, const char *payload)
 
 void MQTT_Reconnect()
 {
+	char log[150];
+
 	// Loop until we're reconnected
 	while (!_MQTTClient.connected())
 	{
@@ -76,21 +78,21 @@ void MQTT_Reconnect()
 		{
 			RUNTIME.mqttConnected = true;
 
-			char Log[250];
-			snprintf_P(Log, sizeof(Log), "%s ONLINE - IP %s", MQTT_DEVICE_ID, WiFi.localIP().toString().c_str());
-			WriteLog(LOG_LEVEL_INFO, Log);
+			snprintf_P(log, sizeof(log), "%s ONLINE - IP %s", MQTT_DEVICE_ID, WiFi.localIP().toString().c_str());
+			WriteLog(LOG_LEVEL_INFO, log);
 
+			char sub_topic[100];
+			
 			// subscribe TOPIC_CMD => command from master
-			_MQTTClient.subscribe(TOPIC_CMD);
+			snprintf_P(sub_topic, sizeof(sub_topic), PSTR("%s/#"), TOPIC_CMD);
+			_MQTTClient.subscribe(sub_topic);
 
 			// subscribe set command topic
-			char set_topic[100];
-			snprintf_P(set_topic, sizeof(set_topic), PSTR("%s/#"), TOPIC_SWITCH_SET);
-			_MQTTClient.subscribe(set_topic);
+			snprintf_P(sub_topic, sizeof(sub_topic), PSTR("%s/#"), TOPIC_SWITCH_SET);
+			_MQTTClient.subscribe(sub_topic);
 		}
 		else
 		{
-			char log[250];
 			sprintf(log, "failed, rc=%d try again in 5 seconds", (_MQTTClient.state()));
 			WriteLog(LOG_LEVEL_DEBUG, log);
 
@@ -104,34 +106,20 @@ void MQTT_Reconnect()
 
 void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 {
-	//
-	//char log[200];
-	//	snprintf_P(log, sizeof(log), "Arrived %d byte on topic %s", length, topic);
-	//	WriteLog(LOG_LEVEL_DEBUG, log);
-
 	String received_payload = "";
 	for (int i = 0; i < (int)length; i++)
 		received_payload = received_payload + (char)payload[i];
 
-	String received_topic = "";
-	received_topic = String(topic);
+	String received_topic = String(topic);
+	// received_topic.replace(TOPIC_PREFIX, "");
 
-	char log[200];
+	char log[150];
 	snprintf_P(log, sizeof(log), "Topic %s - payload  %s", received_topic.c_str(), received_payload.c_str());
 	WriteLog(LOG_LEVEL_DEBUG, log);
 
-	if (received_topic == String(TOPIC_CMD))
+	if (received_topic.indexOf(TOPIC_CMD) == 0)
 	{
-		if (received_payload == String("MQTTDiscoveryOn"))
-		{
-			WriteLog(LOG_LEVEL_INFO, "mqttDiscoveryEnabled = true");
-			RUNTIME.mqttDiscoveryEnabled = true;
-		}
-		else if (received_payload == String("MQTTDiscoveryOff"))
-		{
-			WriteLog(LOG_LEVEL_INFO, "mqttDiscoveryEnabled = false");
-			RUNTIME.mqttDiscoveryEnabled = false;
-		}
+		MQTT_CmdManager(received_topic, received_payload);
 	}
 	else if (received_topic.indexOf(TOPIC_SWITCH_SET) == 0)
 	{
@@ -150,5 +138,129 @@ void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 
 		// push in command queue
 		commandList.push(&receivedCommand);
+	}
+}
+
+void MQTT_DiscoveryUpdateStatus(char knxDeviceAddress[], int status)
+{
+	char mqtt_data[200];
+	char mqtt_topic[120];
+
+	snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s/%s"), TOPIC_SWITCH_STATE, knxDeviceAddress);
+
+	switch(status)
+	{
+		case CMD_TYPE_ON:
+		case CMD_TYPE_SCENE:
+			snprintf_P(mqtt_data, sizeof(mqtt_data), "ON");
+			break;
+		
+		case CMD_TYPE_OFF:
+			snprintf_P(mqtt_data, sizeof(mqtt_data), "OFF");
+			break;
+	}
+
+	MQTT_Publish(mqtt_topic, mqtt_data);
+}
+
+void MQTT_DiscoveryConfig(char knxDeviceAddress[], int status)
+{
+	char mqtt_data[200];
+	char mqtt_topic[120];
+	char type[20];
+
+	switch(status)
+	{
+		case CMD_TYPE_SCENE:
+		    snprintf_P(type, sizeof(type), "SCENE");
+			break;
+
+		case CMD_TYPE_ON:
+		case CMD_TYPE_OFF:
+			snprintf_P(type, sizeof(type), "GROUP");
+			break;
+
+		default:
+			snprintf_P(type, sizeof(type), "UNKN");
+	}
+
+	snprintf_P(mqtt_topic, sizeof(mqtt_topic), TOPIC_DISCOVERY, knxDeviceAddress);
+
+	snprintf_P(mqtt_data, sizeof(mqtt_data), "{\"name\": \"%s %s\", \"command_topic\": \"%s/%s\", \"state_topic\":\"%s/%s\"}",
+				type, 
+				knxDeviceAddress,
+				TOPIC_SWITCH_SET,
+				knxDeviceAddress,
+				TOPIC_SWITCH_STATE,
+				knxDeviceAddress);
+
+	MQTT_Publish(mqtt_topic, mqtt_data);
+}
+
+void MQTT_CmdManager(String topic, String payload)
+{
+	String command = getValueSeparator(topic, '/', 2);
+
+	if(command == String("MQTTDiscovery"))
+	{
+		if(payload == String("ON"))
+		{
+			WriteLog(LOG_LEVEL_INFO, "MQTTDiscoveryEnabled = true");
+			RUNTIME.MQTTDiscoveryEnabled = true;
+		}
+		else
+		{
+			WriteLog(LOG_LEVEL_INFO, "MQTTDiscoveryEnabled = false");
+			RUNTIME.MQTTDiscoveryEnabled = false;
+		}
+	}
+	else if(command == String("KNXDiscovery"))
+	{
+		if(payload == String("ON"))
+		{
+			WriteLog(LOG_LEVEL_INFO, "KnxDiscoveryEnabled = true");
+			RUNTIME.KnxDiscoveryEnabled = true;
+		}
+		else
+		{
+			WriteLog(LOG_LEVEL_INFO, "KnxDiscoveryEnabled = false");
+			RUNTIME.KnxDiscoveryEnabled = false;
+		}
+	}
+	else if(command == String("MQTTBusTrace"))
+	{
+		if(payload == String("ON"))
+		{
+			WriteLog(LOG_LEVEL_INFO, "mqttBusTrace = true");
+			SYSCONFIG.mqttBusTrace = true;
+		}
+		else
+		{
+			WriteLog(LOG_LEVEL_INFO, "mqttBusTrace = false");
+			SYSCONFIG.mqttBusTrace = false;
+		}
+	}
+	else if(command == String("SaveConfig"))
+	{
+		saveConfiguration();
+	}
+	else if(command == String("KNXDeviceDescription"))
+	{
+		String deviceAddr = getValueSeparator(topic, '/', 3);
+
+		// knx device address request
+		char knxDeviceAddress[KNX_DEVICE_ADDRESS_SIZE];
+		memset(&knxDeviceAddress, 0, KNX_DEVICE_ADDRESS_SIZE);
+		memcpy(knxDeviceAddress, &deviceAddr[0], KNX_DEVICE_ADDRESS_SIZE-1);
+
+		KNX_Device_UpdateDescription(knxDeviceAddress, payload.c_str());
+	}
+	else if(command == String("PrintKNXDevices"))
+	{
+		KNX_PrintDevices();
+	}
+	else if(command == String("MQTTUpdateDiscovery"))
+	{
+		KNX_UpdateDiscovery();
 	}
 }

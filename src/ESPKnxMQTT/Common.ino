@@ -17,6 +17,35 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <EEPROM.h>
+
+void storeStruct(void *data_source, size_t size)
+{
+	EEPROM.begin(size * 2);
+
+	// clear EEPROM before write
+	//for (size_t i = 0 ; i < EEPROM.length() ; i++)
+	//	EEPROM.write(i, 0);
+
+	for(size_t i = 0; i < size; i++)
+	{
+		char data = ((char *)data_source)[i];
+		EEPROM.write(i, data);
+	}
+
+	EEPROM.commit();
+}
+
+void loadStruct(void *data_dest, size_t size)
+{
+	EEPROM.begin(size * 2);
+	for(size_t i = 0; i < size; i++)
+	{
+		char data = EEPROM.read(i);
+		((char *)data_dest)[i] = data;
+	}
+}
+
 void WriteLog(int msgLevel, const char *msgLog)
 {
 	if (SYSCONFIG.serialLogLevel >= msgLevel)
@@ -24,8 +53,8 @@ void WriteLog(int msgLevel, const char *msgLog)
 
 	if (SYSCONFIG.mqttLogLevel >= msgLevel)
 	{
-		char Log[250];
-		snprintf_P(Log, sizeof(Log), "%lu - %s", millis(), msgLog);
-		MQTT_Publish(TOPIC_LOG, msgLog);
+		char log[250];
+		snprintf_P(log, sizeof(log), "%lu - %s", millis(), msgLog);
+		MQTT_Publish(TOPIC_LOG, log);
 	}
 }

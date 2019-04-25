@@ -60,10 +60,10 @@ String KNX_Receive()
         char res[240];
         bytes_to_char(replyBuffer, replyLen, res);
 
-        if (SYSCONFIG.mqttEnable)
+        if (SYSCONFIG.mqttBusTrace && replyLen > 4)
         {
             char log[250];
-            snprintf_P(log, sizeof(log), "RX << [%s]", res);
+            snprintf_P(log, sizeof(log), "RX << [%s] len = %d", res, replyLen * 2);
             MQTT_Publish(TOPIC_BUS, log);
         }
 
@@ -84,10 +84,10 @@ String KNX_Send(String msg, bool waitresponse = false, bool trace = true, int mi
     }
     //Serial.write(msg.c_str());
 
-    if (SYSCONFIG.mqttEnable && trace)
+    if (SYSCONFIG.mqttBusTrace && trace)
     {
         char log[250];
-        snprintf_P(log, sizeof(log), "TX >> [%s]", msg.c_str());
+        snprintf_P(log, sizeof(log), "TX >> [%s] len = %d", msg.c_str(), msg.length());
         MQTT_Publish(TOPIC_BUS, log);
     }
 
@@ -95,14 +95,12 @@ String KNX_Send(String msg, bool waitresponse = false, bool trace = true, int mi
     delay(millsdelay);
 
     if (waitresponse)
-    {
         return KNX_Receive();
-    }
     else
         return "";
 }
 
-bool KNX_Send(char ch, bool waitresponse = false, bool trace = true, int millsdelay = 5)
+bool KNX_Send(char ch, bool waitresponse = false, bool trace = false, int millsdelay = 5)
 {
     char *p = &ch;
     return KNX_Send(p, waitresponse, trace, millsdelay);
@@ -172,9 +170,158 @@ byte KNX_ConvertByte(char cByte_1, char cByte_2)
 
 bool KNX_SendCommand(byte command[], int len)
 {
+    Serial.write('@');
+    delayMicroseconds(100);
+    Serial.write('W');
+    delayMicroseconds(100);
+    //Serial.write(0x09);
+    Serial.write((byte)len);
+    delayMicroseconds(100);
+
+    for (int i = 0; i <= len; i++)
+    {
+        Serial.write(command[i]);
+        delayMicroseconds(100);
+    }
+
+    Serial.flush();
+
+    if (SYSCONFIG.mqttBusTrace)
+    {
+        char msg[100];
+        bytes_to_char(command, 9, msg);
+        char log[200];
+        snprintf_P(log, sizeof(log), "TX >> [%s]", msg);
+        MQTT_Publish(TOPIC_BUS, log);
+    }
 
     return true;
 }
+
+int KNX_Device_Find(char knxDeviceAddress[])
+{
+    for(int i = 0; i < MAX_KNX_DEVICES; i++)
+    {
+        if(!SYSCONFIG.KnxDevices[i].Configured)
+            continue;
+
+        if(memcmp(SYSCONFIG.KnxDevices[i].KnxAddress, knxDeviceAddress, KNX_DEVICE_ADDRESS_SIZE) == 0)
+            return i;
+    }
+
+    return -1;
+}
+
+bool KNX_Device_UpdateDescription(char knxDeviceAddress[], String description)
+{
+    int offDevice = -1;
+    char log[150];
+
+    offDevice = KNX_Device_Find(knxDeviceAddress);
+
+    if(offDevice < 0)
+    {
+        snprintf_P(log, sizeof(log), "KNX_Device_UpdateDescription addr [%s] not found!", knxDeviceAddress);
+        WriteLog(LOG_LEVEL_INFO, log);
+        return false;
+    }
+
+    description.toCharArray(SYSCONFIG.KnxDevices[offDevice].Description, KNX_DEVICE_DESCRIPTION);
+
+    // .LastStatus = status;
+    snprintf_P(log, sizeof(log), "KNX_Device_UpdateDescription #%d addr [%s]", offDevice, knxDeviceAddress);
+    WriteLog(LOG_LEVEL_INFO, log);
+
+    return true;
+}
+
+void KNX_Device_Status(char knxDeviceAddress[], int type, int status, bool mqttUpdate = true)
+{
+    int offDevice = -1;
+    char log[150];
+
+    offDevice = KNX_Device_Find(knxDeviceAddress);
+
+    if(offDevice < 0)
+    {
+        snprintf_P(log, sizeof(log), "KNX_Device_Status addr [%s] not found", knxDeviceAddress);
+		WriteLog(LOG_LEVEL_INFO, log);
+
+        if(RUNTIME.KnxDiscoveryEnabled)
+        {
+            for(int i = 0; i < MAX_KNX_DEVICES; i++)
+            {
+                if(SYSCONFIG.KnxDevices[i].Configured)
+                    continue;
+
+                SYSCONFIG.KnxDevices[i].Configured = true;
+
+                memcpy(SYSCONFIG.KnxDevices[i].KnxAddress, knxDeviceAddress, KNX_DEVICE_ADDRESS_SIZE);
+    			SYSCONFIG.KnxDevices[i].Type = type;
+			    SYSCONFIG.KnxDevices[i].LastStatus = status;
+
+                snprintf_P(log, sizeof(log), "KNX_Device_Status #%d addr [%s] configured ", i, knxDeviceAddress);
+		        WriteLog(LOG_LEVEL_INFO, log);
+                
+                break;
+            }
+        }
+    }
+    else
+    {
+        SYSCONFIG.KnxDevices[offDevice].LastStatus = status;
+        snprintf_P(log, sizeof(log), "KNX_Device_Status #%d addr [%s] desc %s - Status = %d", 
+                offDevice, knxDeviceAddress, SYSCONFIG.KnxDevices[offDevice].Description, status);
+        WriteLog(LOG_LEVEL_INFO, log);
+    }
+
+    if(mqttUpdate)
+        MQTT_DiscoveryUpdateStatus(knxDeviceAddress, status);
+}
+
+void KNX_PrintDevices()
+{
+    char log[150];
+
+    for(int i = 0; i < MAX_KNX_DEVICES; i++)
+    {
+        if(!SYSCONFIG.KnxDevices[i].Configured)
+            continue;
+
+        snprintf_P(log, sizeof(log), "KNX_Device #%d addr [%s] type %d desc [%s] LastStatus %d", 
+                i, 
+                SYSCONFIG.KnxDevices[i].KnxAddress,
+                SYSCONFIG.KnxDevices[i].Type, 
+                SYSCONFIG.KnxDevices[i].Description,
+                SYSCONFIG.KnxDevices[i].LastStatus);
+        WriteLog(LOG_LEVEL_INFO, log);
+    }
+}
+
+void KNX_UpdateDiscovery()
+{
+    char mqtt_data[200];
+    char mqtt_topic[120];
+
+    for(int i = 0; i < MAX_KNX_DEVICES; i++)
+    {
+        if(!SYSCONFIG.KnxDevices[i].Configured)
+            continue;
+
+        snprintf_P(mqtt_topic, sizeof(mqtt_topic), TOPIC_DISCOVERY, SYSCONFIG.KnxDevices[i].KnxAddress);
+
+        snprintf_P(mqtt_data, sizeof(mqtt_data), "{\"name\": \"%s %s\", \"command_topic\": \"%s/%s\", \"state_topic\":\"%s/%s\"}",
+                    SYSCONFIG.KnxDevices[i].Description, 
+                    SYSCONFIG.KnxDevices[i].KnxAddress,
+                    TOPIC_SWITCH_SET,
+                    SYSCONFIG.KnxDevices[i].KnxAddress,
+                    TOPIC_SWITCH_STATE,
+                    SYSCONFIG.KnxDevices[i].KnxAddress);
+
+        MQTT_Publish(mqtt_topic, mqtt_data);
+    }
+}
+
 
 bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
 {
@@ -182,64 +329,45 @@ bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
     snprintf_P(log, sizeof(log), "KNX_ExeCommand - type [%d] to Device [%s]", cmdType, knxDeviceAddress);
     WriteLog(LOG_LEVEL_INFO, log);
 
+    // command to send
     byte cmd[20];
 
-    // B4 10 0B 0B 25 E1 00 81 1E
-    cmd[0] = 0xB4;
-    cmd[1] = 0x10;
-    cmd[2] = 0x0B;
-
-    // destination device address
-    cmd[3] = KNX_ConvertByte(knxDeviceAddress[0], knxDeviceAddress[1]);
-    cmd[4] = KNX_ConvertByte(knxDeviceAddress[2], knxDeviceAddress[3]);
-
-    cmd[5] = 0xE1;
-    cmd[6] = 0x00;
-
-    if (cmdType == CMD_TYPE_ON)
-        cmd[7] = 0x81;
-    else
-        cmd[7] = 0x80;
-
-    // calculate telegram CRC
-    cmd[8] = KNX_CRC(cmd, 8);
-    cmd[9] = 0;
-
-    Serial.write('@');
-    delayMicroseconds(100);
-    Serial.write('W');
-    delayMicroseconds(100);
-    Serial.write(0x09);
-    delayMicroseconds(100);
-
-    for (unsigned int i = 0; i <= 9; i++)
+    int devType = -1;
+    switch(cmdType)
     {
-        Serial.write(cmd[i]);
-        delayMicroseconds(100);
+        case CMD_TYPE_ON:
+        case CMD_TYPE_OFF:
+
+            devType = TYPE_SWITCH;
+
+            // B4 10 0B 0B 25 E1 00 81 1E
+            cmd[0] = 0xB4;
+            cmd[1] = 0x10;
+            cmd[2] = 0x0B;
+
+            // destination device address
+            cmd[3] = KNX_ConvertByte(knxDeviceAddress[0], knxDeviceAddress[1]);
+            cmd[4] = KNX_ConvertByte(knxDeviceAddress[2], knxDeviceAddress[3]);
+
+            cmd[5] = 0xE1;
+            cmd[6] = 0x00;
+
+            if (cmdType == CMD_TYPE_ON)
+                cmd[7] = 0x81;
+            else
+                cmd[7] = 0x80;
+
+            // calculate telegram CRC
+            cmd[8] = KNX_CRC(cmd, 8);
+            cmd[9] = 0;
+
+            // send message to KNX bus
+            KNX_SendCommand(cmd, 9);
+
+            break;
     }
 
-    Serial.flush();
-
-    if (SYSCONFIG.mqttEnable)
-    {
-        char msg[100];
-        bytes_to_char(cmd, 9, msg);
-        char log[200];
-        snprintf_P(log, sizeof(log), "TX >> [%s]", msg);
-        MQTT_Publish(TOPIC_BUS, log);
-    }
-
-    char mqtt_data[200];
-    char mqtt_topic[200];
-
-    snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s/%s"), TOPIC_SWITCH_STATE, knxDeviceAddress);
-
-    if (cmdType == CMD_TYPE_ON)
-        snprintf_P(mqtt_data, sizeof(mqtt_data), "ON");
-    else
-        snprintf_P(mqtt_data, sizeof(mqtt_data), "OFF");
-
-    MQTT_Publish(mqtt_topic, mqtt_data);
+    KNX_Device_Status(knxDeviceAddress, devType, cmdType);
 
     delay(100);
 
@@ -274,50 +402,45 @@ void KNX_ReadBus()
     // check telegram length
     if (knxRead.length() == 18 || knxRead.length() == 20)
     {
-        // check telegram header
-        if (knxRead[0] == 'B' && knxRead[1] == '4')
+        // check telegram header (VIMAR ByMe)
+        if (knxRead.substring(0,2) == "B4")
         {
             // get Knx device address
-            char knxDeviceAddress[5];
-            knxDeviceAddress[0] = knxRead[6];
-            knxDeviceAddress[1] = knxRead[7];
-            knxDeviceAddress[2] = knxRead[8];
-            knxDeviceAddress[3] = knxRead[9];
-            knxDeviceAddress[4] = 0;
-
-            char mqtt_data[200];
-            char mqtt_topic[100];
-
-            if (RUNTIME.mqttDiscoveryEnabled)
+            char knxDeviceAddress[KNX_DEVICE_ADDRESS_SIZE];
+            memset(&knxDeviceAddress, 0, KNX_DEVICE_ADDRESS_SIZE);
+            memcpy(knxDeviceAddress, &knxRead[6], KNX_DEVICE_ADDRESS_SIZE-1);
+           
+            int status = -1;
+            int type = -1;
+            if(knxRead.length() == 20)  // scenario activate
             {
-                snprintf_P(mqtt_topic, sizeof(mqtt_topic), TOPIC_DISCOVERY, knxDeviceAddress);
-
-                snprintf_P(mqtt_data, sizeof(mqtt_data), "{\"name\": \"%s\", \"command_topic\": \"%s/%s\", \"state_topic\":\"%s/%s\"}",
-                           knxDeviceAddress,
-                           TOPIC_SWITCH_SET,
-                           knxDeviceAddress,
-                           TOPIC_SWITCH_STATE,
-                           knxDeviceAddress);
+                if (knxRead[14] == '8' && knxRead[15] == '0')
+                {
+                    type = TYPE_SCENE;
+                    status = CMD_TYPE_SCENE;
+                }
             }
-            else
+            else // group ON / OFF / DIMMER
             {
-                snprintf_P(mqtt_topic, sizeof(mqtt_topic), PSTR("%s/%s"), TOPIC_SWITCH_STATE, knxDeviceAddress);
+                type = TYPE_SWITCH;
 
                 if (knxRead[14] == '8' && knxRead[15] == '1')
-                    snprintf_P(mqtt_data, sizeof(mqtt_data), "ON");
+                    status = CMD_TYPE_ON;
                 else
-                    snprintf_P(mqtt_data, sizeof(mqtt_data), "OFF");
+                    status = CMD_TYPE_OFF;
             }
 
-            MQTT_Publish(mqtt_topic, mqtt_data);
+            KNX_Device_Status(knxDeviceAddress, type , status, !RUNTIME.MQTTDiscoveryEnabled);
+
+            if (RUNTIME.MQTTDiscoveryEnabled)
+                MQTT_DiscoveryConfig(knxDeviceAddress, status);
         }
     }
 }
 
 void KNX_Loop()
 {
-
-    // check
+    // execute request commands
     for (int i = 0; i < commandList.getCount(); i++)
     {
         _command cmd;

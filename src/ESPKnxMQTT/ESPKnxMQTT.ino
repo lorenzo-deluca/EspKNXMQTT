@@ -38,9 +38,11 @@ extern "C"
 
 // runtime data
 _runtimeType RUNTIME = {
+	false,			// Configured
 	false, 			// mqttConnected
 	false, 			// wiFiConnected
 	false, 			// KnxGateInit
+	false,			// KnxDiscoveryEnabled
 	false 	 		// mqttDiscoveryEnabled
 };
 
@@ -54,14 +56,14 @@ _syscfgType SYSCONFIG = {
 	LOG_LEVEL_ALL,		// mqttLogLevel
 	
 	"",					// mqtt_server[20]
-	"1883",				// mqtt_port[6]
+	"",					// mqtt_port[6]
 	"",					// mqtt_user[8]
 	"", 				// mqtt_password[10]
    
-	false,				// static_cfg
-	"",					// static_ip[];
-	"",					// static_mask[];
-	""					// static_gtw[];
+	false //,				// static_cfg
+	//"",					// static_ip[];
+	//"",					// static_mask[];
+	//""					// static_gtw[];
 };
 
 WiFiClient _WiFiClient;
@@ -82,9 +84,9 @@ WiFiManagerParameter cfg_mqtt_port		("mqtt_port", "mqtt port", SYSCONFIG.mqtt_po
 WiFiManagerParameter cfg_mqtt_user		("mqtt_user", "mqtt user", SYSCONFIG.mqtt_user, 8);
 WiFiManagerParameter cfg_mqtt_password	("mqtt_password", "mqtt password", SYSCONFIG.mqtt_password, 10);
 
-WiFiManagerParameter cfg_static_ip		("static_ip", "static ip", SYSCONFIG.static_ip, IP_ADDRESS_LEN);
-WiFiManagerParameter cfg_static_mask	("static_mask", "static mask", SYSCONFIG.static_mask, IP_ADDRESS_LEN);
-WiFiManagerParameter cfg_static_gtw		("static_gtw", "static gtw", SYSCONFIG.static_gtw, IP_ADDRESS_LEN);
+//WiFiManagerParameter cfg_static_ip		("static_ip", "static ip", SYSCONFIG.static_ip, IP_ADDRESS_LEN);
+//WiFiManagerParameter cfg_static_mask	("static_mask", "static mask", SYSCONFIG.static_mask, IP_ADDRESS_LEN);
+//WiFiManagerParameter cfg_static_gtw		("static_gtw", "static gtw", SYSCONFIG.static_gtw, IP_ADDRESS_LEN);
 
 void setup()
 {
@@ -110,6 +112,8 @@ void setup()
 	digitalWrite(0, LOW); // A0 OUTPUT BASSO
 	delay(10);
 
+	strcpy(SYSCONFIG.mqtt_topic_prefix, TOPIC_PREFIX);
+
 	// Load configuration from EEPROM
 	RUNTIME.Configured = Configuration_Load();
 
@@ -126,7 +130,7 @@ void setup()
 	}
 	else
 	{
-		WiFi.disconnect();
+		// WiFi.disconnect();
 		Serial.setTimeout(1000);
 		if (!wifiManager.autoConnect(APSSID, APPSK))
 		{
@@ -136,8 +140,8 @@ void setup()
 	}
 	
 	//if you get here you have connected to the WiFi
-	WriteLog(LOG_LEVEL_INFO, "WiFi connected - IPv4 =");
-    WriteLog(LOG_LEVEL_INFO, WiFi.localIP().toString().c_str());
+//	WriteLog(LOG_LEVEL_INFO, "WiFi connected - IPv4 =");
+//	WriteLog(LOG_LEVEL_INFO, WiFi.localIP().toString().c_str());
 	
 	lastConnectTry = millis();
 

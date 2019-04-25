@@ -21,50 +21,17 @@
 #define _MY_HEADER_H
 
 // configuration version
-#define CONFIG_VERSION "CFG01"
+#define CONFIG_VERSION "CFG00"
 
 #define IP_ADDRESS_LEN 16
+#define KNX_DEVICE_ADDRESS_SIZE 5
+#define KNX_DEVICE_DESCRIPTION  15
 
-struct _syscfgType
-{
-    // configuration version
-    char version[6];
-
-    bool mqttEnable;
-    bool mqttUpdateEnable;
-    bool webServerEnable;
-
-    int serialLogLevel;
-    int mqttLogLevel;
-    
-    // mqtt configuration
-    char mqtt_server[20];
-    char mqtt_port[6];
-    char mqtt_user[8];
-    char mqtt_password[10];
-    
-    // optional static ip configuration
-    bool static_cfg;
-    char static_ip[IP_ADDRESS_LEN];
-    char static_mask[IP_ADDRESS_LEN];
-    char static_gtw[IP_ADDRESS_LEN];
-};
-
-struct _runtimeType
-{
-    bool Configured;
-
-    bool mqttConnected;
-    bool wiFiConnected;
-    
-    bool KnxGateInit;
-    bool mqttDiscoveryEnabled;
-};
+#define MAX_KNX_DEVICES 64
 
 // command list struct
 #define CMD_LIST_IMPLEMENTATION FIFO
 #define CMD_LIST_SIZE           32
-#define KNX_DEVICE_ADDRESS_SIZE 5
 
 enum LoggingLevels
 {
@@ -76,12 +43,71 @@ enum LoggingLevels
     LOG_LEVEL_ALL
 };
 
+enum deviceType
+{
+    TYPE_SWITCH,
+    TYPE_SCENE,
+    TYPE_RELAY,
+    TYPE_DIMMER
+};
+
 enum commandType
 {
     CMD_TYPE_ON,
     CMD_TYPE_OFF,
     CMD_TYPE_UP,
-    CMD_TYPE_DOWN
+    CMD_TYPE_DOWN,
+    CMD_TYPE_SCENE
+};
+
+struct _knxDevice
+{
+    bool    Configured;
+    char    KnxAddress[KNX_DEVICE_ADDRESS_SIZE];
+    int     Type;
+    int     LastStatus;
+    int     RelayAddr;
+    char    Description[KNX_DEVICE_DESCRIPTION];
+};
+
+struct _syscfgType
+{
+    // configuration version
+    char version[6];
+
+    bool mqttBusTrace;
+    bool mqttUpdateEnable;
+    bool webServerEnable;
+
+    int serialLogLevel;
+    int mqttLogLevel;
+    
+    // mqtt configuration
+    char mqtt_server[20];
+    char mqtt_port[6];
+    char mqtt_user[8];
+    char mqtt_password[10];
+    char mqtt_topic_prefix[10];
+    
+    // optional static ip configuration
+    bool static_cfg;
+   // char static_ip[IP_ADDRESS_LEN];
+   // char static_mask[IP_ADDRESS_LEN];
+   // char static_gtw[IP_ADDRESS_LEN];
+
+   _knxDevice KnxDevices[MAX_KNX_DEVICES];
+};
+
+struct _runtimeType
+{
+    bool Configured;
+
+    bool mqttConnected;
+    bool wiFiConnected;
+    
+    bool KnxGateInit;
+    bool KnxDiscoveryEnabled;
+    bool MQTTDiscoveryEnabled;
 };
 
 struct _command
@@ -103,7 +129,7 @@ struct _command
 #define MQTT_DEVICE_ID "EspKnxMQTT"
 
 // MQTT Topics
-#define TOPIC_PREFIX ""
+#define TOPIC_PREFIX "knxhome"
 #define TOPIC_LOG "knxhome/log"
 #define TOPIC_STATE "knxhome/state"
 #define TOPIC_BUS "knxhome/bus"
