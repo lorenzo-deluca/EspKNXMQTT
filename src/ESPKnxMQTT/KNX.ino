@@ -198,9 +198,11 @@ bool KNX_SendCommand(byte command[], int len)
     return true;
 }
 
-int KNX_Device_Find(char knxDeviceAddress[])
+int KNX_Device_Find(char knxDeviceAddress[], bool addNewDevice = false)
 {
-    for(int i = 0; i < MAX_KNX_DEVICES; i++)
+    int i;
+
+    for(i = 0; i < MAX_KNX_DEVICES; i++)
     {
         if(!SYSCONFIG.KnxDevices[i].Configured)
             continue;
@@ -209,92 +211,87 @@ int KNX_Device_Find(char knxDeviceAddress[])
             return i;
     }
 
-    return -1;
-}
-
-bool KNX_Device_UpdateDescription(char knxDeviceAddress[], String description)
-{
-    int offDevice = -1;
-    char log[150];
-
-    offDevice = KNX_Device_Find(knxDeviceAddress);
-
-    if(offDevice < 0)
+    if(addNewDevice)
     {
-        snprintf_P(log, sizeof(log), "KNX_Device_UpdateDescription addr [%s] not found!", knxDeviceAddress);
-        WriteLog(LOG_LEVEL_INFO, log);
-        return false;
+        for(i = 0; i < MAX_KNX_DEVICES; i++)
+        {
+            if(SYSCONFIG.KnxDevices[i].Configured)
+                continue;
+
+            SYSCONFIG.KnxDevices[i].Configured = true;
+            memcpy(SYSCONFIG.KnxDevices[i].KnxAddress, knxDeviceAddress, KNX_DEVICE_ADDRESS_SIZE);
+
+            return i;
+        }
     }
 
-    description.toCharArray(SYSCONFIG.KnxDevices[offDevice].Description, KNX_DEVICE_DESCRIPTION);
-
-    // .LastStatus = status;
-    snprintf_P(log, sizeof(log), "KNX_Device_UpdateDescription #%d addr [%s]", offDevice, knxDeviceAddress);
-    WriteLog(LOG_LEVEL_INFO, log);
-
-    return true;
+    return -1;
 }
 
 void KNX_Device_Status(char knxDeviceAddress[], int type, int status, bool mqttUpdate = true)
 {
     int offDevice = -1;
-    char log[150];
 
-    offDevice = KNX_Device_Find(knxDeviceAddress);
+    offDevice = KNX_Device_Find(knxDeviceAddress, RUNTIME.KnxDiscoveryEnabled);
 
     if(offDevice < 0)
-    {
-        snprintf_P(log, sizeof(log), "KNX_Device_Status addr [%s] not found", knxDeviceAddress);
-		WriteLog(LOG_LEVEL_INFO, log);
-
-        if(RUNTIME.KnxDiscoveryEnabled)
-        {
-            for(int i = 0; i < MAX_KNX_DEVICES; i++)
-            {
-                if(SYSCONFIG.KnxDevices[i].Configured)
-                    continue;
-
-                SYSCONFIG.KnxDevices[i].Configured = true;
-
-                memcpy(SYSCONFIG.KnxDevices[i].KnxAddress, knxDeviceAddress, KNX_DEVICE_ADDRESS_SIZE);
-    			SYSCONFIG.KnxDevices[i].Type = type;
-			    SYSCONFIG.KnxDevices[i].LastStatus = status;
-
-                snprintf_P(log, sizeof(log), "KNX_Device_Status #%d addr [%s] configured ", i, knxDeviceAddress);
-		        WriteLog(LOG_LEVEL_INFO, log);
-                
-                break;
-            }
-        }
-    }
+		WriteLog(LOG_LEVEL_INFO, "KNX_Device_Status addr [%s] not found", knxDeviceAddress);
     else
     {
+        SYSCONFIG.KnxDevices[offDevice].Type = type;
         SYSCONFIG.KnxDevices[offDevice].LastStatus = status;
-        snprintf_P(log, sizeof(log), "KNX_Device_Status #%d addr [%s] desc %s - Status = %d", 
+
+        WriteLog(LOG_LEVEL_INFO, "KNX_Device_Status #%d addr [%s] desc %s - Status = %d", 
                 offDevice, knxDeviceAddress, SYSCONFIG.KnxDevices[offDevice].Description, status);
-        WriteLog(LOG_LEVEL_INFO, log);
     }
 
     if(mqttUpdate)
         MQTT_DiscoveryUpdateStatus(knxDeviceAddress, status);
 }
 
+void KNX_Device_Config(char knxDeviceAddress[], String description, int type, int relay)
+{
+    int offDevice = -1;
+
+    offDevice = KNX_Device_Find(knxDeviceAddress, true);
+
+    if(offDevice < 0)
+    {
+        WriteLog(LOG_LEVEL_INFO, "KNX_Device_Config addr [%s] not found", knxDeviceAddress);
+        return;
+    }	
+
+    // config or update Device config
+    if(type != -1)
+        SYSCONFIG.KnxDevices[offDevice].Type = type;
+    
+    if(relay != -1)
+        SYSCONFIG.KnxDevices[offDevice].RelayAddr = relay;
+    
+    description.toCharArray(SYSCONFIG.KnxDevices[offDevice].Description, KNX_DEVICE_DESCRIPTION);
+
+    WriteLog(LOG_LEVEL_INFO, 
+                    "KNX_Device_Config #%d addr [%s] desc: %s tpye: %d relay: %d", 
+                    offDevice,
+                    knxDeviceAddress,
+                    SYSCONFIG.KnxDevices[offDevice].Description,
+                    SYSCONFIG.KnxDevices[offDevice].Type,
+                    SYSCONFIG.KnxDevices[offDevice].RelayAddr);
+}
+
 void KNX_PrintDevices()
 {
-    char log[150];
-
     for(int i = 0; i < MAX_KNX_DEVICES; i++)
     {
         if(!SYSCONFIG.KnxDevices[i].Configured)
             continue;
 
-        snprintf_P(log, sizeof(log), "KNX_Device #%d addr [%s] type %d desc [%s] LastStatus %d", 
+        WriteLog(LOG_LEVEL_INFO,  "KNX_Device #%d addr [%s] type %d desc [%s] LastStatus %d", 
                 i, 
                 SYSCONFIG.KnxDevices[i].KnxAddress,
                 SYSCONFIG.KnxDevices[i].Type, 
                 SYSCONFIG.KnxDevices[i].Description,
                 SYSCONFIG.KnxDevices[i].LastStatus);
-        WriteLog(LOG_LEVEL_INFO, log);
     }
 }
 
@@ -325,9 +322,7 @@ void KNX_UpdateDiscovery()
 
 bool KNX_ExeCommand(char knxDeviceAddress[], int cmdType)
 {
-    char log[250];
-    snprintf_P(log, sizeof(log), "KNX_ExeCommand - type [%d] to Device [%s]", cmdType, knxDeviceAddress);
-    WriteLog(LOG_LEVEL_INFO, log);
+    WriteLog(LOG_LEVEL_INFO, "KNX_ExeCommand - type [%d] to Device [%s]", cmdType, knxDeviceAddress);
 
     // command to send
     byte cmd[20];

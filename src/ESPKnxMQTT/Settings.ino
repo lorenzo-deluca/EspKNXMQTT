@@ -52,6 +52,22 @@ void saveConfigCallback ()
 	saveConfiguration();
 }
 
+void Configuration_ClearDevices()
+{
+	// clean devices table
+	for(int i = 0; i < MAX_KNX_DEVICES; i++)
+	{
+		SYSCONFIG.KnxDevices[i].Configured = false;
+		memset(SYSCONFIG.KnxDevices[i].KnxAddress, ' ', KNX_DEVICE_ADDRESS_SIZE);
+		SYSCONFIG.KnxDevices[i].Type = -1;
+		SYSCONFIG.KnxDevices[i].LastStatus = -1;
+		SYSCONFIG.KnxDevices[i].RelayAddr = -1;
+		memset(SYSCONFIG.KnxDevices[i].Description, ' ', KNX_DEVICE_DESCRIPTION);
+	}
+
+	WriteLog(LOG_LEVEL_INFO, "Configuration_ClearDevices");
+}
+
 // load whats in EEPROM in to the local CONFIGURATION if it is a valid setting
 bool Configuration_Read() 
 {
@@ -73,16 +89,7 @@ bool Configuration_Read()
 	else
 	{
 		// no valid Configuration found !
-
-		// clean devices table
-		for(int i = 0; i < MAX_KNX_DEVICES; i++)
-		{
-			SYSCONFIG.KnxDevices[i].Configured = false;
-			memset(SYSCONFIG.KnxDevices[i].KnxAddress, ' ', KNX_DEVICE_ADDRESS_SIZE);
-			SYSCONFIG.KnxDevices[i].Type = -1;
-			SYSCONFIG.KnxDevices[i].LastStatus = -1;
-			memset(SYSCONFIG.KnxDevices[i].Description, ' ', KNX_DEVICE_DESCRIPTION);
-		}
+		Configuration_ClearDevices();
 
 		return false;
 	}

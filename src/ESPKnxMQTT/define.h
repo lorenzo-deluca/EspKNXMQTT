@@ -21,7 +21,7 @@
 #define _MY_HEADER_H
 
 // configuration version
-#define CONFIG_VERSION "CFG00"
+#define CONFIG_VERSION "CFG01"
 
 #define IP_ADDRESS_LEN 16
 #define KNX_DEVICE_ADDRESS_SIZE 5

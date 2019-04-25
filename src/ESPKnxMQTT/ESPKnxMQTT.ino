@@ -139,10 +139,6 @@ void setup()
 		}
 	}
 	
-	//if you get here you have connected to the WiFi
-//	WriteLog(LOG_LEVEL_INFO, "WiFi connected - IPv4 =");
-//	WriteLog(LOG_LEVEL_INFO, WiFi.localIP().toString().c_str());
-	
 	lastConnectTry = millis();
 
 	// load configuration

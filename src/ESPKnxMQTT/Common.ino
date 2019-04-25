@@ -46,6 +46,7 @@ void loadStruct(void *data_dest, size_t size)
 	}
 }
 
+/*
 void WriteLog(int msgLevel, const char *msgLog)
 {
 	if (SYSCONFIG.serialLogLevel >= msgLevel)
@@ -57,4 +58,41 @@ void WriteLog(int msgLevel, const char *msgLog)
 		snprintf_P(log, sizeof(log), "%lu - %s", millis(), msgLog);
 		MQTT_Publish(TOPIC_LOG, log);
 	}
+}
+*/
+
+void WriteLog_Internal(int msgLevel, const char *msgLog)
+{
+	if (SYSCONFIG.serialLogLevel >= msgLevel)
+		Serial.println(msgLog);
+
+	if (SYSCONFIG.mqttLogLevel >= msgLevel)
+	{
+		char log[250];
+		snprintf_P(log, sizeof(log), "%lu - %s", millis(), msgLog);
+		MQTT_Publish(TOPIC_LOG, log);
+	}
+}
+
+void WriteLog(int msgLevel, const char * str, ...)
+{
+	char msgLog[150];
+
+	// componing variable message
+ 	va_list arglist;
+    va_start(arglist, str);
+	vsnprintf_P(msgLog, sizeof(msgLog), str, arglist);
+	va_end(arglist);
+
+	// send log
+	WriteLog_Internal(msgLevel, msgLog);
+}
+
+int StrToInt(String str, int def = -1)
+{
+	int ret = str.toInt();
+	if (ret < 0)
+		ret = def;
+
+	return ret;
 }

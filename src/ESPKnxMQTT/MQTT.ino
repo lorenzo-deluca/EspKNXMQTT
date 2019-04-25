@@ -66,8 +66,6 @@ void MQTT_Publish(const char *topic, const char *payload)
 
 void MQTT_Reconnect()
 {
-	char log[150];
-
 	// Loop until we're reconnected
 	while (!_MQTTClient.connected())
 	{
@@ -78,8 +76,7 @@ void MQTT_Reconnect()
 		{
 			RUNTIME.mqttConnected = true;
 
-			snprintf_P(log, sizeof(log), "%s ONLINE - IP %s", MQTT_DEVICE_ID, WiFi.localIP().toString().c_str());
-			WriteLog(LOG_LEVEL_INFO, log);
+			WriteLog(LOG_LEVEL_INFO, "%s ONLINE - IP %s", MQTT_DEVICE_ID, WiFi.localIP().toString().c_str());
 
 			char sub_topic[100];
 			
@@ -93,8 +90,7 @@ void MQTT_Reconnect()
 		}
 		else
 		{
-			sprintf(log, "failed, rc=%d try again in 5 seconds", (_MQTTClient.state()));
-			WriteLog(LOG_LEVEL_DEBUG, log);
+			WriteLog(LOG_LEVEL_DEBUG, "failed, rc=%d try again in 5 seconds", (_MQTTClient.state()));
 
 			RUNTIME.mqttConnected = false;
 
@@ -111,11 +107,8 @@ void MQTT_Callback(char *topic, byte *payload, unsigned int length)
 		received_payload = received_payload + (char)payload[i];
 
 	String received_topic = String(topic);
-	// received_topic.replace(TOPIC_PREFIX, "");
 
-	char log[150];
-	snprintf_P(log, sizeof(log), "Topic %s - payload  %s", received_topic.c_str(), received_payload.c_str());
-	WriteLog(LOG_LEVEL_DEBUG, log);
+	WriteLog(LOG_LEVEL_DEBUG, "Topic %s - payload  %s", received_topic.c_str(), received_payload.c_str());
 
 	if (received_topic.indexOf(TOPIC_CMD) == 0)
 	{
@@ -240,11 +233,11 @@ void MQTT_CmdManager(String topic, String payload)
 			SYSCONFIG.mqttBusTrace = false;
 		}
 	}
-	else if(command == String("SaveConfig"))
+	else if(command == String("Save"))
 	{
 		saveConfiguration();
 	}
-	else if(command == String("KNXDeviceDescription"))
+	else if(command == String("KNXDeviceConfig"))
 	{
 		String deviceAddr = getValueSeparator(topic, '/', 3);
 
@@ -253,7 +246,10 @@ void MQTT_CmdManager(String topic, String payload)
 		memset(&knxDeviceAddress, 0, KNX_DEVICE_ADDRESS_SIZE);
 		memcpy(knxDeviceAddress, &deviceAddr[0], KNX_DEVICE_ADDRESS_SIZE-1);
 
-		KNX_Device_UpdateDescription(knxDeviceAddress, payload.c_str());
+		KNX_Device_Config(knxDeviceAddress, 
+							getValueSeparator(payload, ',', 0), 
+							StrToInt(getValueSeparator(payload, ',', 1)), 
+							StrToInt(getValueSeparator(payload, ',', 2)));
 	}
 	else if(command == String("PrintKNXDevices"))
 	{
