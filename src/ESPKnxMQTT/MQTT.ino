@@ -237,6 +237,12 @@ void MQTT_CmdManager(String topic, String payload)
 	{
 		saveConfiguration();
 	}
+	else if(Command == String("Restart"))
+	{
+		// restart ESP after save configuration
+		delay(2000);
+		ESP.restart();
+	}
 	else if(command == String("KNXDeviceConfig"))
 	{
 		String deviceAddr = getValueSeparator(topic, '/', 3);
