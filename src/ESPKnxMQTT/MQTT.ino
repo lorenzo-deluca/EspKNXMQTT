@@ -237,7 +237,7 @@ void MQTT_CmdManager(String topic, String payload)
 	{
 		saveConfiguration();
 	}
-	else if(Command == String("Restart"))
+	else if(command == String("Restart"))
 	{
 		// restart ESP after save configuration
 		delay(2000);
